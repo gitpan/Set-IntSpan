@@ -2,9 +2,17 @@
 # module is free software; you can redistribute it and/or modify it
 # under the same terms as Perl itself.
 
-# $Id: IntSpan.pm,v 1.4 1996/02/22 20:06:04 swm Exp $
+# $Id: IntSpan.pm,v 1.6 1996/06/03 18:28:29 swm Exp $
 
 # $Log: IntSpan.pm,v $
+# Revision 1.6  1996/06/03  18:28:29  swm
+# runs clean under -w
+# moved test code to t/*.t
+#
+# Revision 1.5  1996/05/30  13:34:47  swm
+# added valid(), min() and max()
+# documentation fixes
+#
 # Revision 1.4  1996/02/22  20:06:04  swm
 # added $Set::IntSpan::Empty_String
 # made IntSpan an Exporter
@@ -13,7 +21,7 @@
 
 require 5.001;
 package Set::IntSpan;
-$Set::IntSpan::VERSION = 1.01;
+$Set::IntSpan::VERSION = 1.02;
 
 require Exporter;
 @ISA = qw(Exporter);
@@ -29,11 +37,12 @@ Set::IntSpan - Manages sets of integers
 
     use Set::IntSpan;
 
-    $set = new Set::IntSpan $set_spec;
-    
+    $Set::IntSpan::Empty_String = $string;
+
+    $set    = new   Set::IntSpan $set_spec;
+    $valid  = valid Set::IntSpan $run_list;
     copy $set $set_spec;
     
-    $Set::IntSpan::Empty_String = $string;
     $run_list	= run_list $set;
     @elements	= elements $set;
     
@@ -49,7 +58,7 @@ Set::IntSpan - Manages sets of integers
     subset	$set $set_spec;
     
     $n = cardinality $set;
-    
+
     empty	$set;
     finite	$set;
     neg_inf	$set;
@@ -61,6 +70,9 @@ Set::IntSpan - Manages sets of integers
     insert	$set $n;
     remove	$set $n;
 
+    $min = min  $set;
+    $max = max  $set;
+    
 
 =head1 REQUIRES
 
@@ -179,6 +191,10 @@ Other characters are not allowed.
 
 =over 15
 
+=item -
+
+{ }
+
 =item 1
 
 { 1 }
@@ -190,10 +206,6 @@ Other characters are not allowed.
 =item -5--1
 
 { -5, -4, -3, -2, -1 }
-
-=item -
-
-{ }
 
 =item (-)
 
@@ -219,6 +231,11 @@ the negative integers
 
 Creates and returns a new set.  
 The initial contents of the set are given by $set_spec.
+
+=item valid Set::IntSpan $run_list;
+
+Returns true if $run_list is a valid run list.
+Otherwise, returns false and leaves an error message in $@.
 
 =item copy $set $set_spec;
 
@@ -279,20 +296,20 @@ The operands are not affected.
 
 =item equal $set $set_spec;
 
-Returns true if $set and $set_spec contain the same elements.
+Returns true iff $set and $set_spec contain the same elements.
 
 =item equivalent $set $set_spec;
 
-Returns true if $set and $set_spec contain the same number of elements.
+Returns true iff $set and $set_spec contain the same number of elements.
 All infinite sets are equivalent.
 
 =item superset $set $set_spec
 
-Returns true if $set is a superset of $set_spec.
+Returns true iff $set is a superset of $set_spec.
 
 =item subset $set $set_spec
 
-Returns true if $set is a subset of $set_spec.
+Returns true iff $set is a subset of $set_spec.
 
 =back
 
@@ -307,27 +324,27 @@ Returns -1 for infinite sets.
 
 =item empty $set;
 
-Returns true if $set is empty.
+Returns true iff $set is empty.
 
 =item finite $set
 
-Returns true if $set if finite.
+Returns true iff $set is finite.
 
 =item neg_inf $set
 
-Returns true if $set contains {x | x<n} for some n.
+Returns true iff $set contains {x | x<n} for some n.
 
 =item pos_inf $set
 
-Returns true if $set contains {x | x>n} for some n.
+Returns true iff $set contains {x | x>n} for some n.
 
 =item infinite $set
 
-Returns true if $set is infinite.
+Returns true iff $set is infinite.
 
 =item universal $set
 
-Returns true if $set contains all integers.
+Returns true iff $set contains all integers.
 
 =back
 
@@ -337,7 +354,7 @@ Returns true if $set contains all integers.
 
 =item member $set $n
 
-Returns true if the integer $n is a member of $set.
+Returns true iff the integer $n is a member of $set.
 
 =item insert $set $n
 
@@ -348,6 +365,22 @@ Does nothing if $n is already a member of $set.
 
 Removes the integer $n from $set.
 Does nothing if $n is not a member of $set.
+
+=back
+
+=head2 Extrema
+
+=over 4
+
+=item min $set
+
+Returns the smallest element of $set, 
+or undef if there is none.
+
+=item max $set
+
+Returns the largest element of $set,
+or undef if there is none.
 
 =back
 
@@ -373,7 +406,7 @@ reassign this reference.
 
 =head1 DIAGNOSTICS
 
-Any method will die() if it is passed an invalid run list.
+Any method (except valid()) will die() if it is passed an invalid run list.
 Possible messages are:
 
 =over 15
@@ -388,8 +421,8 @@ $run_list has overlapping runs or runs that are out of order.
 
 =back
 
-elements $set will die() if $set is infinite.  
-    
+elements $set will die() if $set is infinite.
+
 elements $set can generate an "Out of memory!" 
 message on sufficiently large finite sets.
 
@@ -406,11 +439,14 @@ Add B<-v> flags for verbose output; the more flags, the more output.
 
 =head1 NOTES
 
+=head2 Traps
+
 Beware of forms like
 
     union $set [1..5];
 
-This passes a slice of @set to union, which is probably not what you want.
+This passes an element of @set to union, 
+which is probably not what you want.
 To force interpretation of $set and [1..5] as separate arguments, 
 use forms like
 
@@ -419,7 +455,31 @@ use forms like
 or
 
     $set->union([1..5]);
-    
+
+=head2 Error handling
+
+There are two common approaches to error handling:
+exceptions and return codes.
+There seems to be some religion on the topic,
+so Set::IntSpan provides support for both.
+
+To catch exceptions, protect method calls with an eval:
+
+    $run_list = <STDIN>;
+    eval { $set = new Set::IntSpan $run_list };
+    $@ and print "$@: try again\n";
+
+To check return codes, use an appropriate method call to validate arguments:
+
+    $run_list = <STDIN>;
+    if (valid Set::IntSpan $run_list) 
+       { $set = new Set::IntSpan $run_list }
+    else
+       { print "$@ try again\n" }
+
+Similarly, use finite() to protect calls to elements():
+
+    finite $set and @elements = elements $set;
 
 Calling elements() on a large, finite set can generate an "Out of
 memory!" message, which cannot be trapped.
@@ -430,12 +490,16 @@ protect calls to elements():
 
 or check the size of $set first:
 
-    cardinality $set < 2_000_000 and @elements = elements $set;
+    finite $set and cardinality $set < 2_000_000 and @elements = elements $set;
+
+=head2 Limitations
 
 Although Set::IntSpan can represent some infinite sets, 
 it does I<not> perform infinite-precision arithmetic.  
 Therefore, 
 finite elements are restricted to the range of integers on your machine.
+
+=head2 Roots
 
 The sets implemented here are based on Macintosh data structures called 
 "regions".
@@ -465,6 +529,16 @@ sub new
     my $set = bless { }, $class;
     $set->{empty_string} = \$Set::IntSpan::Empty_String;
     copy $set $set_spec;
+}
+
+
+sub valid
+{
+    my($class, $run_list) = @_;
+
+    my $set = new Set::IntSpan;
+    eval { _copy_run_list $set $run_list };
+    return $@ ? 0 : 1;
 }
 
 
@@ -533,7 +607,7 @@ sub _copy_set			# copies one set to another
 sub _copy_run_list		# parses a run list
 {
     my($set, $runList) = @_;
-    my(@edges);
+    my($run, @edges);
 
     _copy_empty($set);
 
@@ -542,48 +616,48 @@ sub _copy_run_list		# parses a run list
   
     my($first, $last) = (1, 0);	# verifies order of infinite runs
 
-    for (split(/,/ , $runList))
+    for $run (split(/,/ , $runList))
     {
     	die "Bad order: $runList\n" if $last;
     	
-      SWITCH: 
+      RUN: 
     	{	    	
-	    /^ (-?\d+) $/x and do
+	    $run =~ /^ (-?\d+) $/x and do
 	    {
 		push(@edges, $1-1, $1);
-		last;
+		last RUN;
 	    };
 
-	    /^ (-?\d+) - (-?\d+) $/x and do
+	    $run =~ /^ (-?\d+) - (-?\d+) $/x and do
 	    {
 		die "Bad order: $runList\n" if $1 > $2;
 		push(@edges, $1-1, $2);
-		last;
+		last RUN;
 	    };
 
-	    /^ \( - (-?\d+) $/x and do
+	    $run =~ /^ \( - (-?\d+) $/x and do
 	    {
 		die "Bad order: $runList\n" unless $first;
 		$set->{negInf} = 1;
 		push @edges, $1;
-		last;
+		last RUN;
 	    };
 
-	    /^ (-?\d+) - \) $/x and do
+	    $run =~ /^ (-?\d+) - \) $/x and do
 	    {
 		push @edges, $1-1;
 		$set->{posInf} = 1;
 		$last = 1;
-		last;
+		last RUN;
 	    };
 
-	    /^ \( - \) $/x and do
+	    $run =~ /^ \( - \) $/x and do
 	    {
 		die "Bad order: $runList\n" unless $first;
 		$last = 1;
 		$set->{negInf} = 1;
 		$set->{posInf} = 1;
-		last;
+		last RUN;
 	    };
 
 	    die "Bad syntax: $runList\n";
@@ -634,8 +708,7 @@ sub run_list
 
     while(@edges)
     {
-	my $lower = shift @edges;
-	my $upper = shift @edges;
+	my($lower, $upper) = splice @edges, 0, 2;
 
 	if ($lower ne '(' and $upper ne ')' and $lower+1==$upper)
 	{
@@ -951,7 +1024,7 @@ sub cardinality
 
     ($set->{negInf} or $set->{posInf}) and return -1;
 
-    my $cardinality;
+    my $cardinality = 0;
     my @edges = @{$set->{edges}};
     while (@edges)
     {
@@ -1098,588 +1171,24 @@ sub remove
 }
 
 
-eval join('',<main::DATA>) or die $@ unless caller();
-
-1;
-__END__
-
-package main;
-
-my $Verbose;
-
-sub test
+sub min
 {
-    test_new();
-    test_elements();
-    test_set_spec();
-    test_real_set();
+    my $set = shift;
 
-    test_union();
-    test_intersect();
-    test_xor();
-    test_diff();
-
-    test_complement();
-
-    test_equal();
-    test_equivalent();
-    test_superset();
-    test_subset();
-
-    test_cardinality();
-
-    test_empty();
-    test_finite();
-    test_neg_inf();
-    test_pos_inf();
-    test_infinite();
-    test_universal();
-
-    test_member(); 
-    test_insert();
-    test_remove();
-
-    test_new_errors();
-    test_elements_errors();
+    empty   $set and return undef;
+    neg_inf $set and return undef;
+    $set->{edges}->[0]+1;
 }
 
 
-my @New = 
-    ([     ''               ,     '-'     , []              ],
-     [    '     '           ,     '-'     , []              ],
-     [    ' ( - )  '        ,    '(-)'    ],
-     [    '-2 -     -1  '   ,    '-2--1'  , [-2,-1]         ],
-
-     [qw{   -                      -     }, []              ],
-     [qw{  1                      1      }, [1]             ],
-     [qw{  1-1                    1      }, [1]             ],
-     [qw{ -1                     -1      }, [-1]            ],
-     [qw{  1-2                    1-2    }, [1,2]           ],
-     [qw{ -2--1                  -2--1   }, [-2,-1]         ],
-     [qw{ -2-1                   -2-1    }, [-2,-1,0,1]     ],
-
-     [qw{  1,2-4                  1-4    }, [1,2,3,4]       ],
-     [qw{  1-3,4,5-7              1-7    }, [1,2,3,4,5,6,7] ],
-     [qw{  1-3,4                  1-4    }, [1,2,3,4]       ],
-     [qw{  1,2,3,4,5,6,7          1-7    }, [1,2,3,4,5,6,7] ],
-     [qw{  1,2-)                  1-)    }                  ],
-     [qw{  (-0,1-)                (-)    }],
-
-     [qw{  (-)                    (-)    }],
-     [qw{  1-)                    1-)    }],
-     [qw{  (-1                    (-1    }],
-     [qw{ -3,-1-)                -3,-1-) }],
-     [qw{  (-1,3                  (-1,3  }]);
-
-
-sub test_new
+sub max
 {
-    print "new\n" if $Verbose;
+    my $set = shift;
 
-    my $test;
-    for $test (@New)
-    {
-        my $set   = new Set::IntSpan $test->[0];
-	my $copy  = new Set::IntSpan $set;
-	my $result_1 = $set ->run_list();
-	my $result_2 = $copy->run_list();
-	my $message = sprintf("new: %-14s -> %-12s -> %-12s\n",
-			      $test->[0], $result_1, $result_2);
-	die $message unless 
-	    $result_1 eq $test->[1] and $result_2 eq $test->[1];
-	print $message if $Verbose > 1;
-    }
+    empty   $set and return undef;
+    pos_inf $set and return undef;
+    $set->{edges}->[-1];
 }
 
 
-sub test_elements
-{
-    print "elements\n" if $Verbose;
-
-    my $t;
-    for $t (@New)
-    {
-        my $set = new Set::IntSpan $t->[0];
-	next if infinite $set;
-	my @elements = elements $set;
-	my $elements = elements $set;
-	my $message = sprintf("elements %-14s -> %-20s : %-20s\n", 
-			      $t->[0], 
-			      join(',', @elements), 
-			      join(',', @$elements) );
-	die $message unless join(',', @elements ) eq join(',', @{$t->[2]});
-	die $message unless join(',', @$elements) eq join(',', @{$t->[2]});
-	print $message if $Verbose > 1;
-    }
-}
-
-
-sub test_set_spec
-{
-    print "set specification\n" if $Verbose;
-
-    my $set = new Set::IntSpan;
-    my $run_list = run_list $set;
-    my $message = "set spec: new Set::IntSpan -> $run_list\n";
-    die $message unless empty $set;
-    print $message if $Verbose > 1;
-
-    my $set_1 = new Set::IntSpan "1-5";
-    my $set_2 = new Set::IntSpan $set_1;
-    my $set_3 = new Set::IntSpan [1, 2, 3, 4, 5];
-
-    my $run_list_1 = run_list $set_1;
-    my $run_list_2 = run_list $set_2;
-    my $run_list_3 = run_list $set_3;
-
-    my $message = "set_spec: $run_list_1 -> $run_list_2 -> $run_list_3\n";
-    die $message unless $set_1->equal($set_2) and $set_1->equal($set_3);
-    print $message if $Verbose > 1;
-}
-
-
-sub test_real_set
-{
-    print "real_set\n" if $Verbose;
-
-    my $set = new Set::IntSpan;
-    my $set_1 = union $set;
-    my $run_list_1 = run_list $set_1;
-    my $message = "_real_set:  union set -> $run_list_1\n";
-    die $message unless empty $set_1;
-    print $message if $Verbose > 1;
-
-    my $set_2 = union $set "1-5,8-9";
-    my $set_3 = union $set $set_2;
-    my $set_4 = union $set +[1, 5, 2, 8, 9, 1, 3, 4, 9];
-
-    my $run_list_2 = run_list $set_2;
-    my $run_list_3 = run_list $set_3;
-    my $run_list_4 = run_list $set_4;
-
-    my $message = "real_set: $run_list_2 -> $run_list_3 -> $run_list_4\n";
-    die $message unless $set_2->equal($set_3) and $set_2->equal($set_4);
-    print $message if $Verbose > 1;
-}
-
-
-my @Binaries =  (
-#     A           B         U        I     X        A-B   B-A 
-[qw{  -           -         -        -     -         -     -   }],
-[qw{  -          (-)       (-)       -    (-)        -    (-)  }],
-[qw{ (-)         (-)       (-)      (-)    -         -     -   }],
-[qw{ (-)         (-1       (-)      (-1   2-)       2-)    -   }],
-
-
-[qw{ (-0         1-)       (-)       -    (-)       (-0   1-)  }],
-[qw{ (-0         2-)       (-0,2-)   -    (-0,2-)   (-0   2-)  }],
-[qw{ (-2         0-)       (-)      0-2   (--1,3-)  (--1  3-)  }],
-
-[qw{ 1           1         1        1      -         -     -   }],
-[qw{ 1           2         1-2       -    1-2        1     2   }],
-[qw{ 3-9         1-2       1-9       -    1-9       3-9   1-2  }],
-[qw{ 3-9         1-5       1-9      3-5   1-2,6-9   6-9   1-2  }],
-[qw{ 3-9         4-8       3-9      4-8   3,9       3,9    -   }],
-[qw{ 3-9         5-12      3-12     5-9   3-4,10-12 3-4  10-12 }],
-[qw{ 3-9        10-12      3-12      -    3-12      3-9  10-12 }],
-
-[qw{ 1-3,5,8-11  1-6       1-6,8-11 1-3,5 4,6,8-11  8-11 4,6   }],
-);
-
-
-sub test_union
-{
-    print "union\n" if $Verbose;
-
-    my $t;
-
-    for $t (@Binaries)
-    {
-	test_binary("union", $t->[0], $t->[1], $t->[2]);
-	test_binary("union", $t->[1], $t->[0], $t->[2]);
-    }
-}
-
-
-sub test_intersect
-{
-    print "intersect\n" if $Verbose;
-
-    my $t;
-
-    for $t (@Binaries)
-    {
-	test_binary("intersect", $t->[0], $t->[1], $t->[3]);
-	test_binary("intersect", $t->[1], $t->[0], $t->[3]);
-    }
-}
-
-
-sub test_xor
-{
-    print "xor\n" if $Verbose;
-
-    my $t;
-
-    for $t (@Binaries)
-    {
-	test_binary("xor", $t->[0], $t->[1], $t->[4]);
-	test_binary("xor", $t->[1], $t->[0], $t->[4]);
-    }
-}
-
-
-sub test_diff
-{
-    print "diff\n" if $Verbose;
-
-    my $t;
-
-    for $t (@Binaries)
-    {
-	test_binary("diff", $t->[0], $t->[1], $t->[5]);
-	test_binary("diff", $t->[1], $t->[0], $t->[6]);
-    }
-}
-
-
-sub test_binary
-{
-    my($method, $op1, $op2, $expected) = @_;
-    my $set1 = new Set::IntSpan $op1;
-    my $set2 = new Set::IntSpan $op2;
-    my $setE = $set1->$method($set2);
-    my $run_list = run_list $setE;
-    my $message = sprintf("%-12s %-10s %-10s -> %-10s\n", 
-			  $method, $op1, $op2, $run_list);
-    die $message unless $run_list eq $expected;
-    print $message if $Verbose > 1;
-}
-
-
-sub test_unary
-{
-    my($method, $operand, $expected) = @_;
-    my $set = new Set::IntSpan $operand;
-    my $setE = $set->$method();
-    my $run_list = run_list $setE;
-    my $message = sprintf("%-12s %-10s -> %-10s\n", 
-			  $method, $operand, $run_list);
-    die $message unless $run_list eq $expected;
-    print $message if $Verbose > 1;
-}
-
-
-sub test_complement
-{
-    print "complement\n" if $Verbose;
-
-    my @test = 
-	(
-	 [qw{ -            (-)        }],
-	 [qw{ (-1          2-)        }],
-	 [qw{ 1            (-0,2-)    }],
-	 [qw{ 1-3          (-0,4-)    }],
-	 [qw{ 1-3,5-9,15-) (-0,4,10-14}],
-	 );
-
-    my $t;
-    for $t (@test)
-    {
-	test_unary("complement", $t->[0], $t->[1]);
-	test_unary("complement", $t->[1], $t->[0]);
-    }
-}
-
-
-my $Rel_sets = [ qw{ - (-) (-0 0-) 1 5 1-5 3-7 1-3,8,10-23 } ];
-
-my $Equal = 
-    [[qw( 1 0 0 0 0 0 0 0 0 )],
-     [qw( 0 1 0 0 0 0 0 0 0 )],
-     [qw( 0 0 1 0 0 0 0 0 0 )],
-     [qw( 0 0 0 1 0 0 0 0 0 )],
-     [qw( 0 0 0 0 1 0 0 0 0 )],
-     [qw( 0 0 0 0 0 1 0 0 0 )],
-     [qw( 0 0 0 0 0 0 1 0 0 )],
-     [qw( 0 0 0 0 0 0 0 1 0 )],
-     [qw( 0 0 0 0 0 0 0 0 1 )]];
-
-my $Equivalent = 
-    [[qw( 1 0 0 0 0 0 0 0 0 )],
-     [qw( 0 1 1 1 0 0 0 0 0 )],
-     [qw( 0 1 1 1 0 0 0 0 0 )],
-     [qw( 0 1 1 1 0 0 0 0 0 )],
-     [qw( 0 0 0 0 1 1 0 0 0 )],
-     [qw( 0 0 0 0 1 1 0 0 0 )],
-     [qw( 0 0 0 0 0 0 1 1 0 )],
-     [qw( 0 0 0 0 0 0 1 1 0 )],
-     [qw( 0 0 0 0 0 0 0 0 1 )]];
-
-my $Superset = 
-    [[qw( 1 0 0 0 0 0 0 0 0 )],
-     [qw( 1 1 1 1 1 1 1 1 1 )],
-     [qw( 1 0 1 0 0 0 0 0 0 )],
-     [qw( 1 0 0 1 1 1 1 1 1 )],
-     [qw( 1 0 0 0 1 0 0 0 0 )],
-     [qw( 1 0 0 0 0 1 0 0 0 )],
-     [qw( 1 0 0 0 1 1 1 0 0 )],
-     [qw( 1 0 0 0 0 1 0 1 0 )],
-     [qw( 1 0 0 0 1 0 0 0 1 )]];
-
-my $Subset = 
-    [[qw( 1 1 1 1 1 1 1 1 1 )],
-     [qw( 0 1 0 0 0 0 0 0 0 )],
-     [qw( 0 1 1 0 0 0 0 0 0 )],
-     [qw( 0 1 0 1 0 0 0 0 0 )],
-     [qw( 0 1 0 1 1 0 1 0 1 )],
-     [qw( 0 1 0 1 0 1 1 1 0 )],
-     [qw( 0 1 0 1 0 0 1 0 0 )],
-     [qw( 0 1 0 1 0 0 0 1 0 )],
-     [qw( 0 1 0 1 0 0 0 0 1 )]];
-
-
-sub test_equal      { test_relation("equal"     , $Rel_sets, $Equal     ) }
-sub test_equivalent { test_relation("equivalent", $Rel_sets, $Equivalent) }
-sub test_superset   { test_relation("superset"  , $Rel_sets, $Superset  ) }
-sub test_subset     { test_relation("subset"    , $Rel_sets, $Subset    ) }
-
-
-sub test_relation
-{
-    my($method, $sets, $expected) = @_;
-    print "$method\n" if $Verbose;
-
-    my($i, $j);
-    for ($i=0; $i<@{$sets}; $i++)
-    {
-	for ($j=0; $j<@{$sets}; $j++)
-	{
-	    test_relation_1($method, $sets->[$i], $sets->[$j], 
-			    $expected->[$i][$j]);
-	}
-    }
-}
-
-
-sub test_relation_1
-{
-    my($method, $op1, $op2, $expected) = @_;
-    my $result;
-    my $set1 = new Set::IntSpan $op1;
-    my $set2 = new Set::IntSpan $op2;
-    $result = $set1->$method($set2);
-    my $message = sprintf("%-12s %-12s %-12s -> %d\n", 
-			  $method, $op1, $op2, $result);
-    die $message unless $result ? $expected : ! $expected;
-    print $message if $Verbose > 1;
-}
-
-
-my @Cardinality = 
-#		  C E F N P I U
-    ([qw{  -	  0 1 1 0 0 0 0 }],
-     [qw{ (-)    -1 0 0 1 1 1 1 }],
-     [qw{ (-0    -1 0 0 1 0 1 0 }],
-     [qw{ 0-)    -1 0 0 0 1 1 0 }],
-     [qw{  1      1 0 1 0 0 0 0 }],
-     [qw{  5      1 0 1 0 0 0 0 }],
-     [qw{ 1,3,5   3 0 1 0 0 0 0 }],
-     [qw{ 1,3-5   4 0 1 0 0 0 0 }],
-     [qw{ 1-5     5 0 1 0 0 0 0 }],
-     );
-
-
-sub test_cardinality
-{
-    print "cardinality\n" if $Verbose;
-    my $t;
-
-    for $t (@Cardinality)
-    {
-	my $operand = $t->[0];
-	my $set = new Set::IntSpan $operand;
-	my $expected = $t->[1];
-
-	my $result = $set->cardinality();
-	my $message = sprintf("%-12s %-12s -> %d\n", 
-			      'cardinality', $operand, $result);
-	die $message unless $result == $expected;
-	print $message if $Verbose > 1;
-    }
-}
-
-
-sub test_empty     { test_size("empty"    , 2) }
-sub test_finite    { test_size("finite"   , 3) }
-sub test_neg_inf   { test_size("neg_inf"  , 4) }
-sub test_pos_inf   { test_size("pos_inf"  , 5) }
-sub test_infinite  { test_size("infinite" , 6) }
-sub test_universal { test_size("universal", 7) }
-
-sub test_size
-{
-    my($method, $column) = @_;
-   
-    print "$method\n" if $Verbose;
-    my $t;
-
-    for $t (@Cardinality)
-    {
-	my $operand = $t->[0];
-	my $set = new Set::IntSpan $operand;
-	my $expected = $t->[$column];
-
-	my $result = $set->$method();
-	my $message = sprintf("%-12s %-12s -> %d\n", 
-			      $method, $operand, $result);
-	
-	die $message unless $result ? $expected : ! $expected;
-	print $message if $Verbose > 1;
-    }
-}
-
-
-my @Member_sets = ( qw{ - (-) (-3 3-) 3 3-5 3-5,7-9 } );
-my @Member_ints = ( 1..7 );
-
-my $Member = 
-    [[qw( 0 0 0 0 0 0 0 )],
-     [qw( 1 1 1 1 1 1 1 )],
-     [qw( 1 1 1 0 0 0 0 )],
-     [qw( 0 0 1 1 1 1 1 )],
-     [qw( 0 0 1 0 0 0 0 )],
-     [qw( 0 0 1 1 1 0 0 )],
-     [qw( 0 0 1 1 1 0 1 )]];
-
-my $Insert = 
-    [[qw{  1         2       3       4       5       6     7      }],
-     [qw{ (-)       (-)     (-)     (-)     (-)     (-)   (-)     }],
-     [qw{ (-3       (-3     (-3     (-4     (-3,5   (-3,6 (-3,7   }],
-     [qw{ 1,3-)     2-)     3-)     3-)     3-)     3-)   3-)     }],
-     [qw{ 1,3       2-3     3       3-4     3,5     3,6   3,7     }],
-     [qw{ 1,3-5     2-5     3-5     3-5     3-5     3-6   3-5,7   }],
-     [qw{ 1,3-5,7-9 2-5,7-9 3-5,7-9 3-5,7-9 3-5,7-9 3-9   3-5,7-9 }]];
-
-my $Remove = 
-    [[qw{ -       -       -       -       -       -       -       }],
-     [qw{ (-0,2-) (-1,3-) (-2,4-) (-3,5-) (-4,6-) (-5,7-) (-6,8-) }],
-     [qw{ (-0,2-3 (-1,3   (-2     (-3     (-3     (-3     (-3     }],
-     [qw{ 3-)     3-)     4-)     3,5-)   3-4,6-) 3-5,7-) 3-6,8-) }],
-     [qw{ 3       3       -       3       3       3       3       }],
-     [qw{ 3-5     3-5     4-5     3,5     3-4     3-5     3-5     }],
-     [qw{ 3-5,7-9 3-5,7-9 4-5,7-9 3,5,7-9 3-4,7-9 3-5,7-9 3-5,8-9 }]];
-
-
-sub test_member
-{
-    print "member\n" if $Verbose;
-
-    my($s, $i);
-
-    for $s (0..$#Member_sets)
-    {
-	for $i (0..$#Member_ints)
-	{
-	    my $run_list = $Member_sets[$s];
-	    my $set = new Set::IntSpan $run_list;
-	    my $int = $Member_ints[$i];
-	    my $result = member $set $int;
-	    my $message = sprintf("%-12s %-12s %d -> %d\n", 
-				  "member", $run_list, $int, $result);
-	    my $expected = $Member->[$s][$i];
-	    die $message unless $result ? $expected : ! $expected;
-	    print $message if $Verbose > 1;
-	}
-    }
-}
-
-
-sub test_insert { test_delta("insert", $Insert) }
-sub test_remove { test_delta("remove", $Remove) }
-
-sub test_delta
-{
-    my($method, $expected) = @_;
-
-    my($s, $i);
-
-    for $s (0..$#Member_sets)
-    {
-	for $i (0..$#Member_ints)
-	{
-	    my $run_list = $Member_sets[$s];
-	    my $set = new Set::IntSpan $run_list;
-	    my $int = $Member_ints[$i];
-	    $set->$method($int);
-	    my $result = run_list $set;
-	    my $message = sprintf("%-12s %-12s %d -> %s\n", 
-				  $method, $run_list, $int, $result);
-	    die $message unless $result eq $expected->[$s][$i];
-	    print $message if $Verbose > 1;
-	}
-    }
-}
-
-
-my @New_errors =
-    ([qw{ 1.2     syntax }],
-     [qw{ 1-2-3   syntax }],
-     [qw{ 1,,2    syntax }],
-     [qw{ --      syntax }],
-     [qw{ abc     syntax }],
-     [qw{ 2,1     order  }],
-     [qw{ 2-1     order  }],
-     [qw{ 3-4,1-2 order  }],
-     [qw{ 3,(-2   order  }],
-     [qw{ 2-),3   order  }],
-     [qw{ (-),1   order  }]);
-
-
-sub test_new_errors
-{
-    print "new_errors\n" if $Verbose;
-    my $error;
-
-    for $error (@New_errors)
-    {
-	my($run_list, $expected) = @$error;
-
-	eval { new Set::IntSpan $run_list };
-	my $message = sprintf("%-20s %-12s -> %s", 
-			      "new Set::Intspan", $run_list, $@);
-	die $message unless $@ =~ /$expected/;
-	print $message if $Verbose > 1;
-    }
-}
-
-
-my @Elements_errors =
-    ([qw{ (-0 infinite }],
-     [qw{ 0-) infinite }],
-     [qw{ (-) infinite }]);
-
-
-sub test_elements_errors
-{
-    print "elements_errors\n" if $Verbose;
-    my $error;
-
-    for $error (@Elements_errors)
-    {
-	my($run_list, $expected) = @$error;
-
-	my $set = new Set::IntSpan $run_list;
-	eval { elements $set };
-	my $message = sprintf("%-20s %-12s -> %s", 
-			      "elements", $run_list, $@);
-	die $message unless $@ =~ /$expected/;
-	print $message if $Verbose > 1;
-    }
-}
-
-
-for (@ARGV) { /-v/ and $Verbose++ }
-test();
-print "OK\n";
-
+1
