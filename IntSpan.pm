@@ -1,6 +1,6 @@
-# Copyright (c) 1996, 1997 Steven McDougall.  All rights reserved.  This
-# module is free software; you can redistribute it and/or modify it
-# under the same terms as Perl itself.
+# Copyright 1996-1998 by Steven McDougall.  This module is free
+# software; you can redistribute it and/or modify it under the same
+# terms as Perl itself.
 
 package Set::IntSpan;
 
@@ -11,7 +11,7 @@ use integer;
 
 require Exporter;
 
-$VERSION   = '1.06';
+$VERSION   = '1.07';
 @ISA       = qw(Exporter);
 @EXPORT_OK = qw(grep_set map_set);
 
@@ -20,20 +20,22 @@ $Set::IntSpan::Empty_String = '-';
 
 sub new
 {
-    my($class, $set_spec) = @_;
+    my($this, $set_spec) = @_;
    
-    my $set = bless { }, $class;
+    my $class = ref($this) || $this;
+    my $set   = bless { }, $class;
     $set->{empty_string} = \$Set::IntSpan::Empty_String;
-    copy $set $set_spec
+    $set->copy($set_spec)
 }
 
 
 sub valid
 {
-    my($class, $run_list) = @_;
+    my($this, $run_list) = @_;
+    my $class = ref($this) || $this;
+    my $set   = new $class;
 
-    my $set = new Set::IntSpan;
-    eval { _copy_run_list $set $run_list };
+    eval { $set->_copy_run_list($run_list) };
     $@ ? 0 : 1
 }
 
@@ -44,10 +46,10 @@ sub copy
 
   SWITCH: 
     {
-	defined $set_spec            or  _copy_empty   ($set           ), last;
-	ref     $set_spec            or  _copy_run_list($set, $set_spec), last;
-	ref     $set_spec eq 'ARRAY' and _copy_array   ($set, $set_spec), last;
-				         _copy_set     ($set, $set_spec)      ;
+	defined $set_spec            or  $set->_copy_empty   (         ), last;
+	ref     $set_spec            or  $set->_copy_run_list($set_spec), last;
+	ref     $set_spec eq 'ARRAY' and $set->_copy_array   ($set_spec), last;
+				         $set->_copy_set     ($set_spec)      ;
     }    
 
     $set
@@ -104,7 +106,7 @@ sub _copy_run_list		# parses a run list
 {
     my($set, $runList) = @_;
 
-    _copy_empty($set);
+    $set->_copy_empty;
 
     $runList =~ s/\s|_//g;
     return if $runList eq '-';	# empty set
@@ -167,7 +169,8 @@ sub _copy_run_list		# parses a run list
     
     $set->{edges} = [ @edges ];
     
-    _cleanup $set or die "Set::IntSpan::_copy_run_list: Bad order: $runList\n";
+    $set->_cleanup or 
+	die "Set::IntSpan::_copy_run_list: Bad order: $runList\n";
 }
 
 
@@ -197,7 +200,7 @@ sub run_list
 {
     my $set = shift;
     
-    return ${$set->{empty_string}} if empty $set;
+    $set->empty and return ${$set->{empty_string}};
 
     my @edges = @{$set->{edges}};
     my @runs;
@@ -243,27 +246,22 @@ sub elements
 }
 
 
-sub _real_set			# converts a set specification into a set
+sub _real_set		# converts a set specification into a set
 {
-    my $set_spec = shift;
+    my($set, $set_spec) = @_;
 
-  SWITCH: 
-    {
-	defined $set_spec             or  return new Set::IntSpan;
-        ref     $set_spec             or  return new Set::IntSpan $set_spec;
-        ref     $set_spec eq 'ARRAY'  and return new Set::IntSpan $set_spec;
-    }    
-
-    $set_spec
+    (defined $set_spec and ref $set_spec and ref $set_spec ne 'ARRAY') ?
+	$set_spec : 
+	$set->new($set_spec)
 }
 
 
 sub union
 {
     my($a, $set_spec) = @_;
-    my $b = _real_set($set_spec);
+    my $b = $a->_real_set($set_spec);
+    my $s = $a->new;
 
-    my $s = new Set::IntSpan;	
     $s->{negInf} = $a->{negInf} || $b->{negInf};
     
     my $eA = $a->{edges};
@@ -314,9 +312,9 @@ sub union
 sub intersect
 {
     my($a, $set_spec) = @_;
-    my $b = _real_set($set_spec);
-    
-    my $s = new Set::IntSpan;	
+    my $b = $a->_real_set($set_spec);
+    my $s = $a->new;
+
     $s->{negInf} = $a->{negInf} && $b->{negInf};
     
     my $eA = $a->{edges};
@@ -367,9 +365,9 @@ sub intersect
 sub diff
 {
     my($a, $set_spec) = @_;
-    my $b = _real_set($set_spec);
-    
-    my $s = new Set::IntSpan;	
+    my $b = $a->_real_set($set_spec);
+    my $s = $a->new;
+
     $s->{negInf} = $a->{negInf} && ! $b->{negInf};
     
     my $eA = $a->{edges};
@@ -420,9 +418,9 @@ sub diff
 sub xor
 {
     my($a, $set_spec) = @_;
-    my $b = _real_set($set_spec);
-    
-    my $s = new Set::IntSpan;	
+    my $b = $a->_real_set($set_spec);
+    my $s = $a->new;
+
     $s->{negInf} = $a->{negInf} ^ $b->{negInf};
     
     my $eA = $a->{edges};
@@ -465,7 +463,7 @@ sub xor
 sub complement
 {
     my $set = shift;
-    my $comp = new Set::IntSpan $set;
+    my $comp = $set->new($set);
     
     $comp->{negInf} = ! $comp->{negInf};
     $comp->{posInf} = ! $comp->{posInf};
@@ -476,7 +474,7 @@ sub complement
 sub superset
 {
     my($a, $set_spec) = @_;
-    my $b = _real_set($set_spec);
+    my $b = $a->_real_set($set_spec);
 
     $b->diff($a)->empty
 }
@@ -493,7 +491,7 @@ sub subset
 sub equal
 {
     my($a, $set_spec) = @_;
-    my $b = _real_set($set_spec);
+    my $b = $a->_real_set($set_spec);
     
     $a->{negInf} == $b->{negInf} or return 0;
     $a->{posInf} == $b->{posInf} or return 0;
@@ -514,9 +512,9 @@ sub equal
 sub equivalent
 {
     my($a, $set_spec) = @_;
-    my $b = _real_set($set_spec);
+    my $b = $a->_real_set($set_spec);
 
-    cardinality($a) == cardinality($b)
+    $a->cardinality == $b->cardinality
 }
 
 
@@ -661,7 +659,7 @@ sub remove
     return unless $inSet;
 
     splice @{$set->{edges}}, $i, 0, $n-1, $n;
-    _cleanup($set);
+    $set->_cleanup;
 }
 
 
@@ -669,8 +667,8 @@ sub min
 {
     my $set = shift;
 
-    empty   $set and return undef;
-    neg_inf $set and return undef;
+    $set->empty   and return undef;
+    $set->neg_inf and return undef;
     $set->{edges}->[0]+1
 }
 
@@ -679,8 +677,8 @@ sub max
 {
     my $set = shift;
 
-    empty   $set and return undef;
-    pos_inf $set and return undef;
+    $set->empty   and return undef;
+    $set->pos_inf and return undef;
     $set->{edges}->[-1]
 }
 
@@ -714,7 +712,7 @@ sub grep_set(&$)
 	}
     }
 
-    my $sub_set = new Set::IntSpan;
+    my $sub_set = $set->new;
     $sub_set->{edges} = \@sub_edges;
     $sub_set
 }    
@@ -726,7 +724,7 @@ sub map_set(&$)
 
     return undef if $set->{negInf} or $set->{posInf};
 
-    my $map_set = new Set::IntSpan;
+    my $map_set = $set->new;
 
     my @edges = @{$set->{edges}};
     while (@edges)
@@ -1512,9 +1510,8 @@ Steven McDougall, swmcd@world.std.com
 
 =head1 COPYRIGHT
 
-Copyright (c) 1996-1998 Steven McDougall. 
-All rights reserved.
-This module is free software; 
-you can redistribute it and/or modify it under the same terms as Perl itself.
+Copyright 1996-1998 by Steven McDougall. This module is free
+software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
 
 =cut

@@ -12,4 +12,5 @@ t/member.t
 t/real_set.t
 t/relation.t
 t/set_spec.t
+t/subclass.t
 t/unary.t

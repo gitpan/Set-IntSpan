@@ -14,9 +14,9 @@ set operations can be performed directly on the encoded
 representation.
 
 COPYRIGHT
-Copyright (c) 1996-1998 Steven McDougall.  All rights reserved.  This
-module is free software; you can redistribute it and/or modify it
-under the same terms as Perl itself.
+Copyright 1996-1998 by Steven McDougall. This module is free
+software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
 
 PREREQUISITES
 Perl5.004

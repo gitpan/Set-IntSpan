@@ -1,5 +1,16 @@
 Revision history for Perl extension Set::IntSpan
 
+1.07  1988 Dec 03
+	- fixes to facilitate subclassing
+	  o use ref $this instead of hardcoded "Set::IntSpan"
+	  o made internal functions into methods
+	  o use method call syntax on all internal method calls,
+	    not function call syntax
+	  o use direct object syntax on all internal method calls,
+	    because indirect object syntax sometimes parses as a 
+	    function call
+	- added ABSTRACT and AUTHOR keys in Makefile.PL
+
 1.06  Mar  3 1998
 	- fixed real_set "0" bug
 
@@ -23,3 +34,4 @@ Revision history for Perl extension Set::IntSpan
 	
 1.00  Jan  2  1996 
 	- original version
+
