@@ -2,7 +2,7 @@
 # module is free software; you can redistribute it and/or modify it
 # under the same terms as Perl itself.
 
-# $Id: IntSpan.pm,v 1.6 1996/06/03 18:28:29 swm Exp $
+# $Id: IntSpan.pm,v 1.6 1996/06/03 18:28:29 swm Exp swm $
 
 # $Log: IntSpan.pm,v $
 # Revision 1.6  1996/06/03  18:28:29  swm
@@ -19,9 +19,9 @@
 # documentation fixes
 #
 
-require 5.001;
+require 5.002;
 package Set::IntSpan;
-$Set::IntSpan::VERSION = 1.02;
+$Set::IntSpan::VERSION = 1.03;
 
 require Exporter;
 @ISA = qw(Exporter);
@@ -72,11 +72,12 @@ Set::IntSpan - Manages sets of integers
 
     $min = min  $set;
     $max = max  $set;
-    
 
 =head1 REQUIRES
 
-Perl 5.001
+Perl 5.002
+
+Exporter
 
 =head1 EXPORTS
 
@@ -425,17 +426,6 @@ elements $set will die() if $set is infinite.
 
 elements $set can generate an "Out of memory!" 
 message on sufficiently large finite sets.
-
-=head1 TESTING
-
-To test IntSpan.pm, run it as a stand-alone perl program:
-
-    %perl IntSpan.pm
-    OK
-    %
-
-Normal output is "OK"; anything else indicates a problem.
-Add B<-v> flags for verbose output; the more flags, the more output.
 
 =head1 NOTES
 

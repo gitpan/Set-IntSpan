@@ -1,8 +1,8 @@
 # -*- perl -*-
-# $Id: real_set.t,v 1.1 1996/06/03 18:34:02 swm Exp $
+# $Id: real_set.t,v 1.1 1996/06/03 18:34:02 swm Exp swm $
 
 use strict;
-use Set::IntSpan 1.02;
+use Set::IntSpan 1.03;
 
 print "1..3\n";
 print "#_real_set\n";
