@@ -1,7 +1,7 @@
 # -*- perl -*- 
     
 use strict;
-use Set::IntSpan 1.04;
+use Set::IntSpan 1.06;
 
 my $N = 1;
 sub Not { print "not " }

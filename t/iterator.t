@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 use strict;
-use Set::IntSpan 1.04 qw(grep_set map_set);
+use Set::IntSpan 1.06 qw(grep_set map_set);
 
 my $N = 1;
 sub Not { print "not " }

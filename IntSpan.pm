@@ -11,7 +11,7 @@ use integer;
 
 require Exporter;
 
-$VERSION   = '1.05';
+$VERSION   = '1.06';
 @ISA       = qw(Exporter);
 @EXPORT_OK = qw(grep_set map_set);
 
@@ -249,9 +249,9 @@ sub _real_set			# converts a set specification into a set
 
   SWITCH: 
     {
-	    $set_spec             or  return new Set::IntSpan;
-        ref $set_spec             or  return new Set::IntSpan $set_spec;
-        ref $set_spec eq 'ARRAY'  and return new Set::IntSpan $set_spec;
+	defined $set_spec             or  return new Set::IntSpan;
+        ref     $set_spec             or  return new Set::IntSpan $set_spec;
+        ref     $set_spec eq 'ARRAY'  and return new Set::IntSpan $set_spec;
     }    
 
     $set_spec
@@ -1451,7 +1451,7 @@ Instead, you have to write something like
 
 C<grep_set> and C<map_set> make it easy to construct
 sets for which the internal representation used by C<Set::IntSpan>
-is I<not> small.  Consider:
+is I<not> small. Consider:
 
   $billion = new Set::IntSpan '0-1_000_000_000';   # OK
   $odd     = grep_set { $_ & 1 } $billion;         # trouble
@@ -1512,7 +1512,7 @@ Steven McDougall, swmcd@world.std.com
 
 =head1 COPYRIGHT
 
-Copyright (c) 1996, 1997 Steven McDougall. 
+Copyright (c) 1996-1998 Steven McDougall. 
 All rights reserved.
 This module is free software; 
 you can redistribute it and/or modify it under the same terms as Perl itself.
