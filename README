@@ -1,4 +1,4 @@
-Set::IntSpan VERSION 1.03 - Manages sets of integers
+Set::IntSpan VERSION 1.04 - Manages sets of integers
 
 DESCRIPTION
 Set::IntSpan manages sets of integers.  It is optimized for sets that
@@ -14,12 +14,12 @@ set operations can be performed directly on the encoded
 representation.
 
 COPYRIGHT
-Copyright (c) 1996 Steven McDougall.  All rights reserved.  This
+Copyright (c) 1996, 1997 Steven McDougall.  All rights reserved.  This
 module is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
 
 PREREQUISITES
-Perl5.002
+Perl5.004
 Exporter
 
 HOW TO BUILD AND INSTALL
@@ -28,20 +28,7 @@ make
 make test
 make install
 
-
-RECENT CHANGES
-
-Changes from 1.02
-Documentation fixes
-
-Changes from 1.01:
-MakeMaker compatibility
-Runs clean under -w
-Added valid()
-Added min() and max()
-Documentation fixes
-
 TODO
 Nothing planned.  
-Send suggestions, bugs, etc. to swm@cric.com
+Send suggestions, bugs, etc. to swmcd@world.std.com
 

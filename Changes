@@ -1,0 +1,19 @@
+Revision history for Perl extension Set::IntSpan
+
+1.04  Jun 12  1997
+	- runs clean under Perl 5.004
+	- added iterators
+
+1.03  Jun  7  1996 
+	- runs clean under -w
+	- moved test code to t/*.t
+	- added valid(), min() and max()
+	- documentation fixes
+
+1.01  Feb 22  1996 
+	- added $Set::IntSpan::Empty_String
+	- made Set::IntSpan an Exporter
+	- documentation fixes
+	
+1.00  Jan  2  1996 
+	- original version

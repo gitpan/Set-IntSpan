@@ -1,23 +1,27 @@
 # -*- perl -*-
-# $Id: error.t,v 1.1 1996/06/03 18:34:02 swm Exp swm $
 
 use strict;
-use Set::IntSpan 1.03;
+use Set::IntSpan 1.04;
 
-my $N;
+my $N = 1;
+sub Not { print "not " }
+sub OK  { print "ok ", $N++, "\n" }
 
-my @Errors =
-    ([qw{ 1.2     syntax }],
-     [qw{ 1-2-3   syntax }],
-     [qw{ 1,,2    syntax }],
-     [qw{ --      syntax }],
-     [qw{ abc     syntax }],
-     [qw{ 2,1     order  }],
-     [qw{ 2-1     order  }],
-     [qw{ 3-4,1-2 order  }],
-     [qw{ 3,(-2   order  }],
-     [qw{ 2-),3   order  }],
-     [qw{ (-),1   order  }]);
+sub Table { map { [ split(' ', $_) ] } split(/\s*\n\s*/, shift) }
+
+my @Errors = Table <<TABLE;
+1.2     syntax 
+1-2-3   syntax 
+1,,2    syntax 
+--      syntax 
+abc     syntax 
+2,1     order  
+2-1     order  
+3-4,1-2 order  
+3,(-2   order  
+2-),3   order  
+(-),1   order  
+TABLE
 
 
 print "1..", 2 * @Errors, "\n";
@@ -35,13 +39,11 @@ sub Errors
 
 	eval { new Set::IntSpan $run_list };
 	printf "#%-20s %-12s -> %s", "new Set::Intspan", $run_list, $@;
-	print "not " unless $@ =~ /$expected/;
-	print "ok ", ++$N, "\n";
+	$@ =~ /$expected/ or Not; OK;
 
 	my $valid = valid Set::IntSpan $run_list;
 	printf "#%-20s %-12s -> %s", "valid Set::Intspan", $run_list, $@;
-	print "not " if $valid or $@ !~ /$expected/;
-	print "ok ", ++$N, "\n";
+	($valid or $@ !~ /$expected/) and Not; OK;
     }
 }
 

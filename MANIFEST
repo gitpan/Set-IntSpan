@@ -6,6 +6,7 @@ t/binary.t
 t/cardinal.t
 t/creation.t
 t/error.t
+t/iterator.t
 t/member.t
 t/real_set.t
 t/relation.t

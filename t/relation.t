@@ -1,11 +1,13 @@
 # -*- perl -*-
-# $Id: relation.t,v 1.1 1996/06/03 18:34:02 swm Exp swm $
 
 use strict;
-use Set::IntSpan 1.03;
+use Set::IntSpan 1.04;
 
-my $N;
-my $Sets = [ qw{ - (-) (-0 0-) 1 5 1-5 3-7 1-3,8,10-23 } ];
+my $N = 1;
+sub Not { print "not " }
+sub OK  { print "ok ", $N++, "\n" }
+
+my $Sets = [ split(' ', q{ - (-) (-0 0-) 1 5 1-5 3-7 1-3,8,10-23 }) ];
 
 my $Equal = 
     [[qw( 1 0 0 0 0 0 0 0 0 )],
@@ -70,10 +72,9 @@ sub Relation
     my($method, $sets, $expected) = @_;
     print "#$method\n";
 
-    my($i, $j);
-    for ($i=0; $i<@{$sets}; $i++)
+    for (my $i=0; $i<@{$sets}; $i++)
     {
-	for ($j=0; $j<@{$sets}; $j++)
+	for (my $j=0; $j<@{$sets}; $j++)
 	{
 	    Relation_1($method, $sets->[$i], $sets->[$j], $expected->[$i][$j]);
 	}
@@ -90,6 +91,5 @@ sub Relation_1
     $result = $set1->$method($set2);
 
     printf "#%-12s %-12s %-12s -> %d\n", $method, $op1, $op2, $result;
-    print "not " unless $result ? $expected : ! $expected;
-    print "ok ", ++$N, "\n";
+    $result ? $expected : ! $expected or Not; OK;
 }

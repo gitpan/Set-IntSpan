@@ -1,10 +1,11 @@
 # -*- perl -*-
-# $Id: cardinal.t,v 1.1 1996/06/03 18:34:02 swm Exp swm $
 
 use strict;
-use Set::IntSpan 1.03;
+use Set::IntSpan 1.04;
 
-my $N;
+my $N = 1;
+sub Not { print "not " }
+sub OK  { print "ok ", $N++, "\n" }
 
 my @Cardinality = 
 #		 C  E  F  N  P  I  U   <      >
@@ -35,9 +36,8 @@ Max();
 sub Cardinality
 {
     print "#cardinality\n";
-    my $t;
 
-    for $t (@Cardinality)
+    for my $t (@Cardinality)
     {
 	my $operand = $t->[0];
 	my $set = new Set::IntSpan $operand;
@@ -45,8 +45,7 @@ sub Cardinality
 
 	my $result = $set->cardinality();
 	printf "#%-12s %-12s -> %d\n", 'cardinality', $operand, $result;
-	print "no " unless $result == $expected;
-	print "ok ", ++$N, "\n";
+	$result == $expected or Not; OK;
     }
 }
 
@@ -63,9 +62,8 @@ sub Size
     my($method, $column) = @_;
    
     print "#$method\n";
-    my $t;
 
-    for $t (@Cardinality)
+    for my $t (@Cardinality)
     {
 	my $operand = $t->[0];
 	my $set = new Set::IntSpan $operand;
@@ -73,8 +71,7 @@ sub Size
 	my $result = $set->$method();
 
 	printf "#%-12s %-12s -> %d\n", $method, $operand, $result;
-	print "no " unless $result ? $expected : ! $expected;
-	print "ok ", ++$N, "\n";
+	$result ? $expected : ! $expected or Not; OK;
     }
 }
 
@@ -88,9 +85,8 @@ sub Extrema
     my($method, $column) = @_;
    
     print "#$method\n";
-    my $t;
 
-    for $t (@Cardinality)
+    for my $t (@Cardinality)
     {
 	my $operand  = $t->[0];
 	my $set      = new Set::IntSpan $operand;
@@ -100,12 +96,9 @@ sub Extrema
 	printf "#%-12s %-12s -> %s\n", 
 	$method, $operand, defined $result ? $result : 'undef';
 
-	print "not " unless
-	    not defined $result and not defined $expected or 
-		defined $result and     defined $expected and 
-		    $result==$expected;
-		
-	print "ok ", ++$N, "\n";
+	not defined $result and not defined $expected or 
+	    defined $result and     defined $expected and $result==$expected or
+		Not; OK;
     }
 }
 
