@@ -2,12 +2,23 @@
 # module is free software; you can redistribute it and/or modify it
 # under the same terms as Perl itself.
 
-package Set::IntSpan;
+# $Id: IntSpan.pm,v 1.4 1996/02/22 20:06:04 swm Exp $
+
+# $Log: IntSpan.pm,v $
+# Revision 1.4  1996/02/22  20:06:04  swm
+# added $Set::IntSpan::Empty_String
+# made IntSpan an Exporter
+# documentation fixes
+#
+
 require 5.001;
+package Set::IntSpan;
+$Set::IntSpan::VERSION = 1.01;
+
+require Exporter;
+@ISA = qw(Exporter);
+
 use strict;
-
-$Set::IntSpan::VERSION = 1.00;
-
 use integer;
 
 =head1 NAME
@@ -17,12 +28,13 @@ Set::IntSpan - Manages sets of integers
 =head1 SYNOPSIS
 
     use Set::IntSpan;
-    
+
     $set = new Set::IntSpan $set_spec;
     
     copy $set $set_spec;
     
-    $runList	= run_list $set;
+    $Set::IntSpan::Empty_String = $string;
+    $run_list	= run_list $set;
     @elements	= elements $set;
     
     $u_set = union	$set $set_spec;
@@ -50,6 +62,10 @@ Set::IntSpan - Manages sets of integers
     remove	$set $n;
 
 
+=head1 REQUIRES
+
+Perl 5.001
+
 =head1 EXPORTS
 
 None
@@ -66,7 +82,7 @@ These arise, for example, in .newsrc files, which maintain lists of articles:
 Sets are stored internally in a run-length coded form.
 This provides for both compact storage and efficient computation.
 In particular, 
-set operations can be performed directly on the encoded represenetation.
+set operations can be performed directly on the encoded representation.
 
 Set::IntSpan is designed to manage finite sets.
 However, it can also represent some simple infinite sets, such as {x | x>n}.
@@ -195,9 +211,9 @@ the negative integers
 
 =head1 METHODS
 
-=over 4
-
 =head2 Creation
+
+=over 4
 
 =item new Set::IntSpan $set_spec;
 
@@ -210,12 +226,14 @@ Copies $set_spec into $set.
 The previous contents of $set are lost.
 For convenience, copy() returns $set.
 
-=item $runList = run_list $set
+=item $run_list = run_list $set
 
 Returns a run list that represents $set.  
 The run list will not contain white space.
-Empty sets are formatted as '-'.
 $set is not affected.
+
+By default, the empty set is formatted as '-'; 
+a different string may be specified in $Set::IntSpan::Empty_String.
 
 =item @elements = elements $set;
 
@@ -282,7 +300,7 @@ Returns true if $set is a subset of $set_spec.
 
 =over 4
 
-=item $n = cardniality $set
+=item $n = cardinality $set
 
 Returns the number of elements in $set.
 Returns -1 for infinite sets.
@@ -319,7 +337,7 @@ Returns true if $set contains all integers.
 
 =item member $set $n
 
-Reurns true if the integer $n is a member of $set.
+Returns true if the integer $n is a member of $set.
 
 =item insert $set $n
 
@@ -333,6 +351,26 @@ Does nothing if $n is not a member of $set.
 
 =back
 
+=head1 CLASS VARIABLES
+
+=over 4
+
+=item $Set::IntSpan::Empty_String
+
+$Set::IntSpan::Empty_String contains the string that is returned when
+run_list() is called on the empty set.
+$Empty_String is initially '-'; 
+alternatively, it may be set to ''.
+Other values should be avoided,
+to ensure that run_list() always returns a valid run list.
+
+run_list() accesses $Empty_String through a reference
+stored in $set->{empty_string}.
+Subclasses that wish to override the value of $Empty_String can
+reassign this reference.
+
+=back
+
 =head1 DIAGNOSTICS
 
 Any method will die() if it is passed an invalid run list.
@@ -342,11 +380,11 @@ Possible messages are:
 
 =item Bad syntax 
 
-$runList has bad syntax
+$run_list has bad syntax
 
 =item Bad order
 
-$runList has overlapping runs or runs that are out of order.
+$run_list has overlapping runs or runs that are out of order.
 
 =back
 
@@ -368,7 +406,7 @@ Add B<-v> flags for verbose output; the more flags, the more output.
 
 =head1 NOTES
 
-Beware of calls like
+Beware of forms like
 
     union $set [1..5];
 
@@ -377,6 +415,9 @@ To force interpretation of $set and [1..5] as separate arguments,
 use forms like
 
     union $set +[1..5];
+
+or
+
     $set->union([1..5]);
     
 
@@ -391,7 +432,7 @@ or check the size of $set first:
 
     cardinality $set < 2_000_000 and @elements = elements $set;
 
-Although Set::IntSpan can represent some infinte sets, 
+Although Set::IntSpan can represent some infinite sets, 
 it does I<not> perform infinite-precision arithmetic.  
 Therefore, 
 finite elements are restricted to the range of integers on your machine.
@@ -414,11 +455,15 @@ you can redistribute it and/or modify it under the same terms as Perl itself.
 =cut
 
 
+$Set::IntSpan::Empty_String = '-';
+
+
 sub new
 {
     my($class, $set_spec) = @_;
    
     my $set = bless { }, $class;
+    $set->{empty_string} = \$Set::IntSpan::Empty_String;
     copy $set $set_spec;
 }
 
@@ -579,7 +624,7 @@ sub run_list
 {
     my $set = shift;
     
-    return '-' if empty $set;
+    return ${$set->{empty_string}} if empty $set;
 
     my @edges = @{$set->{edges}};
     my @runs;
@@ -1055,6 +1100,7 @@ sub remove
 
 eval join('',<main::DATA>) or die $@ unless caller();
 
+1;
 __END__
 
 package main;
