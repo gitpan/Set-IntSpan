@@ -14,3 +14,4 @@ t/relation.t
 t/set_spec.t
 t/subclass.t
 t/unary.t
+META.yml                                Module meta-data (added by MakeMaker)

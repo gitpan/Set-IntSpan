@@ -1,5 +1,9 @@
 Revision history for Perl extension Set::IntSpan
 
+1.08  2004 May 07
+        - added the spans method
+	- cleaned up some warnings
+
 1.07  1988 Dec 03
 	- fixes to facilitate subclassing
 	  o use ref $this instead of hardcoded "Set::IntSpan"

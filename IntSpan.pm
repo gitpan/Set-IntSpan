@@ -1,19 +1,13 @@
-# Copyright 1996-1998 by Steven McDougall.  This module is free
-# software; you can redistribute it and/or modify it under the same
-# terms as Perl itself.
-
 package Set::IntSpan;
 
+use 5;
 use strict;
-use 5.004;
-use vars qw($VERSION @ISA @EXPORT_OK);
 use integer;
+use base qw(Exporter);
 
-require Exporter;
+our $VERSION   = '1.08';
+our @EXPORT_OK = qw(grep_set map_set);
 
-$VERSION   = '1.07';
-@ISA       = qw(Exporter);
-@EXPORT_OK = qw(grep_set map_set);
 
 $Set::IntSpan::Empty_String = '-';
 
@@ -243,6 +237,26 @@ sub elements
     }
 
     wantarray ? @elements : \@elements
+}
+
+sub spans
+{
+    my $set   = shift;
+    my @edges = @{$set->{edges}};
+
+    unshift @edges, undef if $set->{negInf};
+    push    @edges, undef if $set->{posInf};
+
+    my @spans;
+    while (@edges)
+    {
+	my($lower, $upper) = splice(@edges, 0, 2);
+	$lower++
+	    if defined $lower;
+	push @spans, [$lower, $upper];
+    }
+
+    @spans
 }
 
 
@@ -894,6 +908,7 @@ __END__
 
 Set::IntSpan - Manages sets of integers
 
+
 =head1 SYNOPSIS
 
   use Set::IntSpan qw(grep_set map_set);
@@ -906,6 +921,7 @@ Set::IntSpan - Manages sets of integers
   
   $run_list = run_list $set;
   @elements = elements $set;
+  @spans    = spans    $set;
   
   $u_set = union      $set $set_spec;
   $i_set = intersect  $set $set_spec;
@@ -943,9 +959,6 @@ Set::IntSpan - Manages sets of integers
   $element = $set->start($n);
   $element = $set->current;
 
-=head1 REQUIRES
-
-Perl 5.004, Exporter
 
 =head1 EXPORTS
 
@@ -956,6 +969,7 @@ Nothing
 =head2 C<@EXPORT_OK>
 
 C<grep_set>, C<map_set>
+
 
 =head1 DESCRIPTION
 
@@ -972,10 +986,10 @@ In particular,
 set operations can be performed directly on the encoded representation.
 
 C<Set::IntSpan> is designed to manage finite sets.
-However, it can also represent some simple infinite sets, such as 
-{x | x>n}.
+However, it can also represent some simple infinite sets, such as {x | x>n}.
 This allows operations involving complements to be carried out consistently, 
 without having to worry about the actual value of INT_MAX on your machine.
+
 
 =head1 SET SPECIFICATIONS
 
@@ -1097,6 +1111,7 @@ the negative integers
 
 =back
 
+
 =head1 ITERATORS
 
 Each set has a single I<iterator>, 
@@ -1115,7 +1130,9 @@ Using C<next> and C<prev>,
 a single loop can move both forwards and backwards through a set.
 Using C<start>, a loop can iterate over portions of an infinite set.
 
+
 =head1 METHODS
+
 
 =head2 Creation
 
@@ -1153,7 +1170,26 @@ The elements will be sorted in numerical order.
 In scalar context, returns an array reference.
 I<$set> is not affected.
 
+=item I<@spans> = C<spans> I<$set>
+
+Returns the runs in I<$set>,
+as a list of the form
+
+  ([$a1, $b1], 
+   [$a2, $b2],
+   ...
+   [$aN, $bN])
+
+If a run contains only a single integer,
+then the upper and lower bounds of the corresponding span will be equal.
+
+If the set has no lower bound, then $a1 will be C<undef>.
+Similarly, 
+if the set has no upper bound, then $bN will be C<undef>.
+
+
 =back
+
 
 =head2 Set operations
 
@@ -1186,6 +1222,7 @@ For all set operations,
 a new C<Set::IntSpan> object is created and returned.  
 The operands are not affected.
 
+
 =head2 Comparison
 
 =over 4
@@ -1208,6 +1245,7 @@ Returns true iff I<$set> is a superset of I<$set_spec>.
 Returns true iff I<$set> is a subset of I<$set_spec>.
 
 =back
+
 
 =head2 Cardinality
 
@@ -1244,6 +1282,7 @@ Returns true iff I<$set> contains all integers.
 
 =back
 
+
 =head2 Membership
 
 =over 4
@@ -1264,6 +1303,7 @@ Does nothing if I<$n> is not a member of I<$set>.
 
 =back
 
+
 =head2 Extrema
 
 =over 4
@@ -1279,6 +1319,7 @@ Returns the largest element of I<$set>,
 or C<undef> if there is none.
 
 =back
+
 
 =head2 Iterators
 
@@ -1333,6 +1374,7 @@ Returns the iterator for I<$set>.
 
 =back
 
+
 =head1 FUNCTIONS
 
 =over 4
@@ -1361,6 +1403,7 @@ Returns C<undef> if I<$set> is infinite.
 
 =back
 
+
 =head1 CLASS VARIABLES
 
 =over 4
@@ -1380,6 +1423,7 @@ Subclasses that wish to override the value of C<$Empty_String> can
 reassign this reference.
 
 =back
+
 
 =head1 DIAGNOSTICS
 
@@ -1405,6 +1449,7 @@ Any method (except C<valid>) will C<die> if it is passed an invalid run list.
 message on sufficiently large finite sets.
 
 =back
+
 
 =head1 NOTES
 
@@ -1504,13 +1549,26 @@ The sets implemented here are based on a Macintosh data structure called
 a I<region>.
 See Inside Macintosh for more information.
 
+
 =head1 AUTHOR
 
-Steven McDougall, swmcd@world.std.com
+Steven McDougall <swmcd@world.std.com>
+
+
+=head1 ACKNOWLEDGMENTS
+
+=over 4
+
+=item *
+
+Martin Krzywinski <martink@bcgsc.ca> 
+
+=back
+
 
 =head1 COPYRIGHT
 
-Copyright 1996-1998 by Steven McDougall. This module is free
+Copyright 1996-2004 by Steven McDougall. This module is free
 software; you can redistribute it and/or modify it under the same
 terms as Perl itself.
 
