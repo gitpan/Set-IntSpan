@@ -1,4 +1,4 @@
-Set::IntSpan VERSION 1.04 - Manages sets of integers
+Set::IntSpan VERSION 1.05 - Manages sets of integers
 
 DESCRIPTION
 Set::IntSpan manages sets of integers.  It is optimized for sets that

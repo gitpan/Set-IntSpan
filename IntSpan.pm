@@ -11,7 +11,7 @@ use integer;
 
 require Exporter;
 
-$VERSION   = '1.04';
+$VERSION   = '1.05';
 @ISA       = qw(Exporter);
 @EXPORT_OK = qw(grep_set map_set);
 
@@ -44,10 +44,10 @@ sub copy
 
   SWITCH: 
     {
-	    $set_spec             or  _copy_empty   ($set           ), last;
-	ref $set_spec             or  _copy_run_list($set, $set_spec), last;
-	ref $set_spec eq 'ARRAY'  and _copy_array   ($set, $set_spec), last;
-				      _copy_set     ($set, $set_spec)      ;
+	defined $set_spec            or  _copy_empty   ($set           ), last;
+	ref     $set_spec            or  _copy_run_list($set, $set_spec), last;
+	ref     $set_spec eq 'ARRAY' and _copy_array   ($set, $set_spec), last;
+				         _copy_set     ($set, $set_spec)      ;
     }    
 
     $set
@@ -1114,7 +1114,7 @@ and C<current> returns it.
 Calls to these methods may be freely intermixed.
 
 Using C<next> and C<prev>, 
-a loop can move both forwards and backwards through a single set.
+a single loop can move both forwards and backwards through a set.
 Using C<start>, a loop can iterate over portions of an infinite set.
 
 =head1 METHODS

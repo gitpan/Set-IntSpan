@@ -1,5 +1,8 @@
 Revision history for Perl extension Set::IntSpan
 
+1.05  Dec 19  1997
+	- fixed new Set::IntSpan "0"  bug
+
 1.04  Jun 12  1997
 	- runs clean under Perl 5.004
 	- added iterators
