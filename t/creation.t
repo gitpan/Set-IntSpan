@@ -9,7 +9,7 @@ sub OK  { print "ok ", $N++, "\n" }
 
 sub Table { map { [ split(' ', $_) ] } split(/\s*\n\s*/, shift) }
 
-my $Err = "Set::IntSpan::elements: infinite set\n";
+my $Err = "Set::IntSpan::elements: infinite set";
 
 my @New = 
 ([''              , '-'      , ''             ,  []		     ],
@@ -75,14 +75,30 @@ sub Elements
 	$expected = $t->[2];
 
 	eval { @elements = elements $set };
-	$result = $@ ? $@ : join(',', @elements );
-	printf "#elements %-14s -> %s\n", $t->[0], $result;
-	$result eq $expected or Not; OK;
+	if ($@)
+	{
+	    printf "#elements %-14s -> %s\n", $t->[0], $@;
+	    $@ =~/$expected/ or Not; OK;
+	}
+	else
+	{
+	    $result = join(',', @elements );
+	    printf "#elements %-14s -> %s\n", $t->[0], $result;
+	    $result eq $expected or Not; OK;
+	}
 
 	eval { $elements = elements $set };
-	$result = $@ ? $@ : join(',', @$elements );
-	printf "#elements %-14s -> %s\n", $t->[0], $result;
-	$result eq $expected or Not; OK;
+	if ($@)
+	{
+	    printf "#elements %-14s -> %s\n", $t->[0], $@;
+	    $@ =~ /$expected/ or Not; OK;
+	}
+	else
+	{
+	    $result = join(',', @$elements );
+	    printf "#elements %-14s -> %s\n", $t->[0], $result;
+	    $result eq $expected or Not; OK;
+	}
     }
 }
 

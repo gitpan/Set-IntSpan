@@ -1,5 +1,9 @@
 Revision history for Perl extension Set::IntSpan
 
+1.09  2005 Dec 13
+        - added indexing methods
+	- 'die' instead of 'craok' on fatal errors
+
 1.08  2004 May 07
         - added the spans method
 	- cleaned up some warnings

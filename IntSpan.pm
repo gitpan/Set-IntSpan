@@ -4,8 +4,9 @@ use 5;
 use strict;
 use integer;
 use base qw(Exporter);
+use Carp;
 
-our $VERSION   = '1.08';
+our $VERSION   = '1.09';
 our @EXPORT_OK = qw(grep_set map_set);
 
 
@@ -110,7 +111,7 @@ sub _copy_run_list		# parses a run list
     my @edges;
     for my $run (split(/,/ , $runList))
     {
-    	die "Set::IntSpan::_copy_run_list: Bad order: $runList\n" if $last;
+    	croak "Set::IntSpan::_copy_run_list: Bad order: $runList\n" if $last;
     	
       RUN: 
     	{	    	
@@ -122,7 +123,7 @@ sub _copy_run_list		# parses a run list
 
 	    $run =~ /^ (-?\d+) - (-?\d+) $/x and do
 	    {
-		die "Set::IntSpan::_copy_run_list: Bad order: $runList\n" 
+		croak "Set::IntSpan::_copy_run_list: Bad order: $runList\n" 
 		    if $1 > $2;
 		push(@edges, $1-1, $2);
 		last RUN;
@@ -130,7 +131,7 @@ sub _copy_run_list		# parses a run list
 
 	    $run =~ /^ \( - (-?\d+) $/x and do
 	    {
-		die "Set::IntSpan::_copy_run_list: Bad order: $runList\n" 
+		croak "Set::IntSpan::_copy_run_list: Bad order: $runList\n" 
 		    unless $first;
 		$set->{negInf} = 1;
 		push @edges, $1;
@@ -147,7 +148,7 @@ sub _copy_run_list		# parses a run list
 
 	    $run =~ /^ \( - \) $/x and do
 	    {
-		die "Set::IntSpan::_copy_run_list: Bad order: $runList\n" 
+		croak "Set::IntSpan::_copy_run_list: Bad order: $runList\n" 
 		    unless $first;
 		$last = 1;
 		$set->{negInf} = 1;
@@ -155,7 +156,7 @@ sub _copy_run_list		# parses a run list
 		last RUN;
 	    };
 
-	    die "Set::IntSpan::_copy_run_list: Bad syntax: $runList\n";
+	    croak "Set::IntSpan::_copy_run_list: Bad syntax: $runList\n";
 	}
 
 	$first = 0;
@@ -164,7 +165,7 @@ sub _copy_run_list		# parses a run list
     $set->{edges} = [ @edges ];
     
     $set->_cleanup or 
-	die "Set::IntSpan::_copy_run_list: Bad order: $runList\n";
+	croak "Set::IntSpan::_copy_run_list: Bad order: $runList\n";
 }
 
 
@@ -226,7 +227,7 @@ sub elements
     my $set = shift;
 
     ($set->{negInf} or $set->{posInf}) and 
-	die "Set::IntSpan::elements: infinite set\n";
+	croak "Set::IntSpan::elements: infinite set\n";
 
     my @elements;
     my @edges = @{$set->{edges}};
@@ -899,6 +900,211 @@ sub prev($)
     $set->{iterator}
 }
 
+sub at
+{
+    my($set, $i) = @_;
+
+    $i < 0 ? $set->_at_neg($i) : $set->_at_pos($i)
+}
+
+
+sub _at_pos
+{
+    my($set, $i) = @_;
+
+    $set->neg_inf and
+	croak "Set::IntSpan::at: negative infinite set\n";
+
+    my @edges = @{$set->{edges}};
+
+    while (@edges > 1)
+    {
+	my($lower, $upper) = splice(@edges, 0, 2);
+
+	my $size = $upper - $lower;
+	
+	$i < $size and return $lower + 1 + $i;
+
+	$i -= $size;
+    }
+
+    @edges ? $edges[0] + 1 + $i : undef
+}
+
+sub _at_neg
+{
+    my($set, $i) = @_;
+
+    $set->pos_inf and
+	croak "Set::IntSpan::at: positive infinite set\n";
+
+    my @edges = @{$set->{edges}};
+    $i++;
+
+    while (@edges > 1)
+    {
+	my($lower, $upper) = splice(@edges, -2, 2);
+
+	my $size = $upper - $lower;
+	
+	-$i < $size and return $upper + $i;
+
+	$i += $size;
+    }
+
+    @edges ? $edges[0] + $i : undef
+}
+
+sub slice
+{
+    my($set, $from, $to) = @_;
+
+    $set->{slicing} = 1;
+    my $slice = $set->_splice($from, $to - $from + 1);
+    $set->{slicing} = 0;
+
+    $slice
+}
+
+sub _splice
+{
+    my($set, $offset, $length) = @_;
+
+    $offset < 0
+	? $set->_splice_neg($offset, $length)
+	: $set->_splice_pos($offset, $length)
+}
+
+sub _splice_pos
+{
+    my($set, $offset, $length) = @_;
+
+    $set->neg_inf and
+	croak "Set::IntSpan::slice: negative infinite set\n";
+
+    my @edges = @{$set->{edges}};
+    my $slice = new Set::IntSpan;
+
+    while (@edges > 1)
+    {
+	my ($lower, $upper) = @edges[0,1];
+	my $size = $upper - $lower;
+	
+	$offset < $size and last;
+
+	splice(@edges, 0, 2);
+	$offset -= $size;
+    }
+
+    @edges or
+	return $slice;  # empty set
+
+    $edges[0] += $offset;
+
+    $slice->{edges} = $set->_splice_length(\@edges, $length);
+    $slice
+}
+
+sub _splice_neg
+{
+    my($set, $offset, $length) = @_;
+
+    $set->pos_inf and
+	croak "Set::IntSpan::slice: positive infinite set\n";
+
+    my @edges = @{$set->{edges}};
+    my $slice = new Set::IntSpan;
+
+    my @slice;
+    $offset++;
+
+    while (@edges > 1)
+    {
+	my ($lower, $upper) = @edges[-2,-1];
+	my $size = $upper - $lower;
+
+	-$offset < $size and last;
+
+	unshift @slice, splice(@edges, -2, 2);
+	$offset += $size;
+    }
+
+    if (@edges)
+    {
+	my $upper = pop @edges;
+	unshift @slice, $upper+$offset-1, $upper;
+    }
+    elsif ($set->{slicing})
+    {
+	$length += $offset-1;
+    }
+
+    $slice->{edges} = $set->_splice_length(\@slice, $length);
+    $slice
+}
+
+sub _splice_length
+{
+    my($set, $edges, $length) = @_;
+
+    not defined $length   and return $edges;  # everything
+    		$length<0 and return $set->_splice_length_neg($edges, -$length);
+                $length>0 and return $set->_splice_length_pos($edges,  $length);
+
+    []  # $length==0
+}
+
+sub _splice_length_pos
+{
+    my($set, $edges, $length) = @_;
+
+    my @slice;
+
+    while (@$edges > 1)
+    {
+	my ($lower, $upper) = @$edges[0,1];
+	my $size = $upper - $lower;
+
+	$length <= $size and last;
+
+	push @slice, splice(@$edges, 0, 2);
+	$length -= $size;
+    }
+
+    if (@$edges)
+    {
+	my $lower = shift @$edges;
+	push @slice, $lower, $lower+$length;
+    }
+
+    \@slice
+}
+
+sub _splice_length_neg
+{
+    my($set, $edges, $length) = @_;
+
+    $set->pos_inf and
+	croak "Set::IntSpan::slice: positive infinite set\n";
+
+    while (@$edges > 1)
+    {
+	my($lower, $upper) = @$edges[-2,-1];
+	my $size = $upper - $lower;
+
+	$length < $size and last;
+
+	splice(@$edges, -2, 2);
+	$length -= $size;
+    }
+
+    if (@$edges)
+    {
+	$edges->[-1] -= $length;
+    }
+
+    $edges
+}
 
 1
 
@@ -958,6 +1164,9 @@ Set::IntSpan - Manages sets of integers
   
   $element = $set->start($n);
   $element = $set->current;
+  
+  $n       = $set->at($i);
+  $slice   = $set->slice($from, $to);
 
 
 =head1 EXPORTS
@@ -1031,9 +1240,9 @@ The set is the union of all the runs.
 
 Runs may be written in any of several forms.
 
-=over 8
-
 =head2 Finite forms
+
+=over 8
 
 =item n
 
@@ -1138,21 +1347,25 @@ Using C<start>, a loop can iterate over portions of an infinite set.
 
 =over 4
 
+
 =item I<$set> = C<new> C<Set::IntSpan> I<$set_spec>
 
 Creates and returns a C<Set::IntSpan> object.
 The initial contents of the set are given by I<$set_spec>.
+
 
 =item I<$ok> = C<valid> C<Set::IntSpan> I<$run_list>
 
 Returns true if I<$run_list> is a valid run list.
 Otherwise, returns false and leaves an error message in $@.
 
+
 =item I<$set> = C<copy> I<$set> I<$set_spec>
 
 Copies I<$set_spec> into I<$set>.
 The previous contents of I<$set> are lost.
 For convenience, C<copy> returns I<$set>.
+
 
 =item I<$run_list> = C<run_list> I<$set>
 
@@ -1163,12 +1376,14 @@ I<$set> is not affected.
 By default, the empty set is formatted as '-'; 
 a different string may be specified in C<$Set::IntSpan::Empty_String>.
 
+
 =item I<@elements> = C<elements> I<$set>
 
 Returns an array containing the elements of I<$set>.
 The elements will be sorted in numerical order.
 In scalar context, returns an array reference.
 I<$set> is not affected.
+
 
 =item I<@spans> = C<spans> I<$set>
 
@@ -1195,22 +1410,27 @@ if the set has no upper bound, then $bN will be C<undef>.
 
 =over 4
 
+
 =item I<$u_set> = C<union> I<$set> I<$set_spec>
 
 Returns the set of integers in either I<$set> or I<$set_spec>.
 
+
 =item I<$i_set> = C<intersect> I<$set> I<$set_spec>
 
 Returns the set of integers in both I<$set> and I<$set_spec>.
+
 
 =item I<$x_set> = C<xor> I<$set> I<$set_spec>
 
 Returns the set of integers in I<$set> or I<$set_spec>, 
 but not both.
 
+
 =item I<$d_set> = C<diff> I<$set> I<$set_spec>
 
 Returns the set of integers in I<$set> but not in I<$set_spec>.
+
 
 =item I<$c_set> = C<complement> I<$set>
 
@@ -1218,8 +1438,9 @@ Returns the set of integers that are not in I<$set>.
 
 =back
 
+
 For all set operations, 
-a new C<Set::IntSpan> object is created and returned.  
+a new C<Set::IntSpan> object is created and returned.
 The operands are not affected.
 
 
@@ -1227,18 +1448,22 @@ The operands are not affected.
 
 =over 4
 
+
 =item C<equal> I<$set> I<$set_spec>
 
 Returns true iff I<$set> and I<$set_spec> contain the same elements.
+
 
 =item C<equivalent> I<$set> I<$set_spec>
 
 Returns true iff I<$set> and I<$set_spec> contain the same number of elements.
 All infinite sets are equivalent.
 
+
 =item C<superset> I<$set> I<$set_spec>
 
 Returns true iff I<$set> is a superset of I<$set_spec>.
+
 
 =item C<subset> I<$set> I<$set_spec>
 
@@ -1251,30 +1476,37 @@ Returns true iff I<$set> is a subset of I<$set_spec>.
 
 =over 4
 
+
 =item I<$n> = C<cardinality> I<$set>
 
 Returns the number of elements in I<$set>.
 Returns -1 for infinite sets.
 
+
 =item C<empty> I<$set>
 
 Returns true iff I<$set> is empty.
+
 
 =item C<finite> I<$set>
 
 Returns true iff I<$set> is finite.
 
+
 =item C<neg_inf> I<$set>
 
 Returns true iff I<$set> contains {x | x<n} for some n.
+
 
 =item C<pos_inf> I<$set>
 
 Returns true iff I<$set> contains {x | x>n} for some n.
 
+
 =item C<infinite> I<$set>
 
 Returns true iff I<$set> is infinite.
+
 
 =item universal I<$set>
 
@@ -1287,14 +1519,17 @@ Returns true iff I<$set> contains all integers.
 
 =over 4
 
+
 =item C<member> I<$set> I<$n>
 
 Returns true iff the integer I<$n> is a member of I<$set>.
+
 
 =item C<insert> I<$set> I<$n>
 
 Inserts the integer I<$n> into I<$set>.
 Does nothing if I<$n> is already a member of I<$set>.
+
 
 =item C<remove> I<$set> I<$n>
 
@@ -1308,10 +1543,12 @@ Does nothing if I<$n> is not a member of I<$set>.
 
 =over 4
 
+
 =item C<min> I<$set>
 
 Returns the smallest element of I<$set>, 
 or C<undef> if there is none.
+
 
 =item C<max> I<$set>
 
@@ -1325,12 +1562,14 @@ or C<undef> if there is none.
 
 =over 4
 
+
 =item I<$set>->C<first>
 
 Sets the iterator for I<$set> to the smallest element of I<$set>.
 If there is no smallest element,
 sets the iterator to C<undef>.
 Returns the iterator.
+
 
 =item I<$set>->C<last>
 
@@ -1339,12 +1578,14 @@ If there is no largest element,
 sets the iterator to C<undef>.
 Returns the iterator.
 
+
 =item I<$set>->C<start>(I<$n>)
 
 Sets the iterator for I<$set> to I<$n>.
 If I<$n> is not an element of I<$set>,
 sets the iterator to C<undef>.
 Returns the iterator.
+
 
 =item I<$set>->C<next>
 
@@ -1357,6 +1598,7 @@ C<next> will return C<undef> only once;
 the next call to C<next> will reset the iterator to 
 the smallest element of I<$set>.
 
+
 =item I<$set>->C<prev>
 
 Sets the iterator for I<$set> to the previous element of I<$set>.
@@ -1368,9 +1610,63 @@ C<prev> will return C<undef> only once;
 the next call to C<prev> will reset the iterator to 
 the largest element of I<$set>.
 
+
 =item I<$set>->C<current>
 
 Returns the iterator for I<$set>.
+
+=back
+
+
+=head2 Indexing
+
+The elements of a set are kept in numerical order.
+These methods index into the set based on this ordering.
+
+=over 4
+
+
+=item I<$n> = I<$set>->C<at>($i)
+
+Returns the I<$i>th element of I<$set>,
+or C<undef> if there is no I<$i>th element.
+Negative indices count backwards from the end of the set.
+
+Dies if
+
+=over 4
+
+=item *
+
+I<$i> is non-negative and I<$set> is C<neg_inf>
+
+=item *
+
+I<$i> is negative and I<$set> is C<pos_inf>
+
+=back
+
+
+=item I<$slice> = I<$set>->C<slice>(I<$from>, I<$to>)
+
+Returns a C<Set::IntSpan> object containing the elements of I<$set>
+at indices I<$from>..I<$to>.
+Negative indices count backwards from the end of the set.
+
+Dies if
+
+=over 4
+
+=item *
+
+I<$from> is non-negative and I<$set> is C<neg_inf>
+
+=item *
+
+I<$from> is negative and I<$set> is C<pos_inf>
+
+=back
+
 
 =back
 
@@ -1442,6 +1738,22 @@ Any method (except C<valid>) will C<die> if it is passed an invalid run list.
 =item C<Set::IntSpan::elements: infinite set>
 
 (F) An infinte set was passed to C<elements>.
+
+=item C<Set::IntSpan::at: negative infinite set>
+
+(F) C<at> was called with a non-negative index on a negative infinite set.
+
+=item C<Set::IntSpan::at: positive infinite set>
+
+(F) C<at> was called with a negative index on a positive infinite set.
+
+=item C<Set::IntSpan::slice: negative infinite set>
+
+(F) C<slice> was called with I<$from> non-negative on a negative infinite set.
+
+=item C<Set::IntSpan::slice: positive infinite set>
+
+(F) C<slice> was called with I<$from> negative on a positive infinite set.
 
 =item Out of memory!
 
@@ -1561,14 +1873,18 @@ Steven McDougall <swmcd@world.std.com>
 
 =item *
 
-Martin Krzywinski <martink@bcgsc.ca> 
+Malcolm Cook <mec@stowers-institute.org>
+
+=item *
+
+Martin Krzywinski <martink@bcgsc.ca>
 
 =back
 
 
 =head1 COPYRIGHT
 
-Copyright 1996-2004 by Steven McDougall. This module is free
+Copyright 1996-2005 by Steven McDougall. This module is free
 software; you can redistribute it and/or modify it under the same
 terms as Perl itself.
 
