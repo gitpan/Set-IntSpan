@@ -59,16 +59,16 @@ sub Grep
     {
         for (my $g=0; $g<@Greps; $g++)
         {
-    	my $set  = new Set::IntSpan $Sets[$s];
-    	my $result = grep_set { eval $Greps[$g] } $set;
-    	my $expected = $expected[$g][$s];
+	    my $set  = new Set::IntSpan $Sets[$s];
+	    my $result = grep_set { eval $Greps[$g] } $set;
+	    my $expected = $expected[$g][$s];
 
-	my $pResult = defined $result ? $result->run_list : 'undef';
-	printf "#%3d: grep_set { %-8s } %-12s -> %s\n",
-	$N, $Greps[$g], $Sets[$s], $pResult;
+	    my $pResult = defined $result ? $result->run_list : 'undef';
+	    printf "#%3d: grep_set { %-8s } %-12s -> %s\n",
+	    $N, $Greps[$g], $Sets[$s], $pResult;
     	
-    	not defined $result and not defined $expected or 
-    	    defined $result and     defined $expected and
+	    not defined $result and not defined $expected or 
+		defined $result and     defined $expected and
     		$result->run_list eq $expected or Not; OK;
         }
     }
@@ -93,16 +93,16 @@ sub Map
     {
         for (my $m=0; $m<@Maps; $m++)
         {
-    	my $set  = new Set::IntSpan $Sets[$s];
-    	my $result = map_set { eval $Maps[$m] } $set;
-    	my $expected = $expected[$m][$s];
+	    my $set  = new Set::IntSpan $Sets[$s];
+	    my $result = map_set { eval $Maps[$m] } $set;
+	    my $expected = $expected[$m][$s];
 
-	my $pResult = defined $result ? $result->run_list : 'undef';
-	printf "#%3d: map_set  { %-8s } %-12s -> %s\n",
-	$N, $Maps[$m], $Sets[$s], $pResult;
-    	
-    	not defined $result and not defined $expected or 
-    	    defined $result and     defined $expected and
+	    my $pResult = defined $result ? $result->run_list : 'undef';
+	    printf "#%3d: map_set  { %-8s } %-12s -> %s\n",
+	    $N, $Maps[$m], $Sets[$s], $pResult;
+	    
+	    not defined $result and not defined $expected or 
+		defined $result and     defined $expected and
     		$result->run_list eq $expected or Not; OK;
         }
     }

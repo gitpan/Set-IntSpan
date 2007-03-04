@@ -37,11 +37,24 @@ my @New =
  ['(-1,3'         , '(-1,3'  , $Err           ,  [[undef,1],[3,3]]   ],
 );
 
+my @New_list = 
+(
+ ['1', '2', '1-2'],
+ ['1-5', '2', '1-5'],
+ ['1-5', '2-8', '1-8'],
+ ['1-5', '2-8', '10-20', '1-8,10-20'],
+ ['(-5', '2-8', '10-20', '(-8,10-20'],
+ ['(-5', '2-8', '10-)', '(-8,10-)'],
+ ['40-45', '20-25', '10-15', '1', '12-13', '1,10-15,20-25,40-45' ]
+);
 
-print "1..", @New * 5, "\n";
+
+print "1..", @New * 6 + @New_list, "\n";
 New     ();
 Elements();
+Sets    ();
 Spans   ();
+New_list();
 
 
 sub New
@@ -102,6 +115,42 @@ sub Elements
     }
 }
 
+sub Sets
+{
+    print "#sets\n";
+
+    for my $t (@New)
+    {
+	my $set      = new Set::IntSpan $t->[0];
+	my @sets     = sets $set;
+	my @expected = map { $_ eq '-' 
+				 ? ()
+				 : new Set::IntSpan $_ } split /,/, $t->[1];
+
+	equal_sets(\@sets, \@expected) or Not; OK;
+    }
+}
+
+sub equal_sets
+{
+    my($a, $b) = @_;
+
+    @$a == @$b or return 0;
+
+    while (@$a)
+    {
+	my $a = shift @$a;
+	my $b = shift @$b;
+
+	ref $a eq 'Set::IntSpan' or return 0;
+	ref $b eq 'Set::IntSpan' or return 0;
+
+	equal $a $b or return 0;
+    }
+
+    1
+}
+
 sub Spans
 {
     print "#spans\n";
@@ -133,4 +182,17 @@ sub equal_lists
     }
 
     1
+}
+
+
+sub New_list
+{
+    for my $t (@New_list)
+    {
+	my @run_lists = @$t;
+	my $expected = pop @run_lists;
+	my $set = new Set::IntSpan @run_lists;
+	my $actual = $set->run_list;
+	$set->equal($expected) or Not; OK;
+    }
 }

@@ -1,4 +1,12 @@
-Revision history for Perl extension Set::IntSpan
+jRevision history for Perl extension Set::IntSpan
+
+1.10  2007 Mar 04
+        - extened new to take list of set_specs
+        - added size as an alias for cardinality
+	- added sets method
+        - added cover (extent), and holes methods
+        - added inset, pad, and trim methods
+        - added grep_spans and map_spans functions
 
 1.09  2005 Dec 13
         - added indexing methods

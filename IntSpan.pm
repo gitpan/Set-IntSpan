@@ -6,8 +6,8 @@ use integer;
 use base qw(Exporter);
 use Carp;
 
-our $VERSION   = '1.09';
-our @EXPORT_OK = qw(grep_set map_set);
+our $VERSION   = '1.10';
+our @EXPORT_OK = qw(grep_set map_set grep_spans map_spans);
 
 
 $Set::IntSpan::Empty_String = '-';
@@ -15,12 +15,19 @@ $Set::IntSpan::Empty_String = '-';
 
 sub new
 {
-    my($this, $set_spec) = @_;
+    my($this, $set_spec, @set_specs) = @_;
    
     my $class = ref($this) || $this;
     my $set   = bless { }, $class;
     $set->{empty_string} = \$Set::IntSpan::Empty_String;
-    $set->copy($set_spec)
+    $set->copy($set_spec);
+
+    while (@set_specs)
+    {
+	$set = $set->union(shift @set_specs);
+    }
+
+    $set
 }
 
 
@@ -221,6 +228,11 @@ sub run_list
     join(',', @runs)
 }
 
+sub dump
+{
+    my $set = shift;
+    ($set->{negInf} ? '(' : '') . join ',', @{$set->{edges}} . ($set->{posInf} ? ')' : '')
+}
 
 sub elements
 {
@@ -239,6 +251,29 @@ sub elements
 
     wantarray ? @elements : \@elements
 }
+
+sub sets
+{
+    my $set   = shift;
+    my @edges = @{$set->{edges}};
+
+    unshift @edges, undef if $set->{negInf};
+    push    @edges, undef if $set->{posInf};
+
+    my @sets;
+    while (@edges)
+    {
+	my($lower, $upper) = splice(@edges, 0, 2);
+
+	$lower = defined $lower ? $lower+1 : '(';
+	$upper = defined $upper ? $upper   : ')';
+
+	push @sets, Set::IntSpan->new("$lower-$upper");
+    }
+
+    @sets
+}
+
 
 sub spans
 {
@@ -551,6 +586,8 @@ sub cardinality
     $cardinality
 }
 
+*size = \&cardinality;
+
 
 sub empty
 {
@@ -697,6 +734,121 @@ sub max
     $set->{edges}->[-1]
 }
 
+sub cover
+{
+    my $set    = shift;
+    my $cover  = $set->new();
+    my $edges  = $set->{edges};
+    my $negInf = $set->{negInf};
+    my $posInf = $set->{posInf};
+
+    if ($negInf and $posInf)
+    {
+	$cover->{negInf}   = 1;
+	$cover->{posInf}   = 1;
+    }
+    elsif ($negInf and not $posInf)
+    {
+	$cover->{negInf}   = 1;
+	$cover->{edges}[0] = $set->{edges}[-1];
+    }
+    elsif (not $negInf and $posInf)
+    {
+	$cover->{edges}[0] = $set->{edges}[0];
+	$cover->{posInf}   = 1;
+    }
+    elsif (@$edges)
+    {
+	$cover->{edges}[0] = $set->{edges}[ 0];
+	$cover->{edges}[1] = $set->{edges}[-1];
+    }
+
+    $cover
+}
+
+*extent = \&cover;
+
+
+sub holes
+{
+    my $set    = shift;
+    my $holes  = $set->new($set);
+    my $edges  = $holes->{edges};
+    my $negInf = $holes->{negInf};
+    my $posInf = $holes->{posInf};
+
+    if ($negInf and $posInf)
+    {
+	$holes->{negInf}   = 0;
+	$holes->{posInf}   = 0;
+    }
+    elsif ($negInf and not $posInf)
+    {
+	$holes->{negInf}   = 0;
+	pop   @$edges;
+    }
+    elsif (not $negInf and $posInf)
+    {
+	shift @$edges;
+	$holes->{posInf}   = 0;
+    }
+    elsif (@$edges)
+    {
+	shift @$edges;
+	pop   @$edges;
+    }
+
+    $holes
+}
+
+sub inset
+{
+    my($set, $n) = @_;
+    my $edges = $set->{edges};
+    my @edges = @$edges;
+
+    my $inset = $set->new();
+    $inset->{negInf} = $set->{negInf};
+    $inset->{posInf} = $set->{posInf};
+
+    my @inset;
+    my $nAbs = abs $n;
+
+    if (@edges and ($inset->{negInf} xor $n < 0))
+    {
+	my $edge = shift @edges;
+	push @inset, $edge - $nAbs;
+    }
+
+    while (@edges > 1)
+    {
+	my($lower, $upper) = splice(@edges, 0, 2);
+	$lower += $nAbs;
+	$upper -= $nAbs;
+
+	push @inset, $lower, $upper
+	    if $lower < $upper;
+    }
+
+    if (@edges)
+    {
+	my $edge = shift @edges;
+	push @inset, $edge + $nAbs;
+    }
+    
+
+    $inset->{edges} = \@inset;
+    $inset
+}
+
+*trim = \&inset;
+
+sub pad
+{
+    my($set, $n) = @_;
+    $set->inset(-$n)
+}
+
 
 sub grep_set(&$)
 {
@@ -756,6 +908,177 @@ sub map_set(&$)
 	    {
 		$map_set->insert($range);
 	    }
+	}
+    }
+
+    $map_set
+}    
+
+
+sub grep_spans(&$)
+{
+    my($block, $set) = @_;
+
+    my @edges     = @{$set->{edges}};
+    my $sub_set   = $set->new;
+    my @sub_edges = ();
+
+    if ($set->{negInf} and $set->{posInf})
+    {
+	local $_ = [ undef, undef ];
+	if (&$block())
+	{
+	    $sub_set->{negInf} = 1;
+	    $sub_set->{posInf} = 1;
+	}
+    }
+    elsif ($set->{negInf})
+    {
+	my $upper = shift @edges;
+	local $_ = [ undef, $upper ];
+	if (&$block())
+	{
+	    $sub_set->{negInf} = 1;
+	    push @sub_edges, $upper;
+	}
+    }
+
+    while (@edges > 1)
+    {
+	my($lower, $upper) = splice(@edges, 0, 2);
+	local $_ = [ $lower+1, $upper ];
+	&$block() and push @sub_edges, $lower, $upper;
+    }
+
+    if (@edges)
+    {
+	my $lower = shift @edges;
+	local $_ = [ $lower+1, undef ];
+	if (&$block())
+	{
+	    $sub_set->{posInf} = 1;
+	    push @sub_edges, $lower;
+	}
+    }
+
+    $sub_set->{edges} = \@sub_edges;
+    $sub_set
+}    
+
+sub bySpan
+{
+    my($al, $au) = @$a;
+    my($bl, $bu) = @$b;
+
+       if (defined $al && defined $bl) { return $al <=> $bl; }
+    elsif (defined $al               ) { return  1;          }
+    elsif (               defined $bl) { return -1;          }
+    elsif (defined $au               ) { return -1;          }
+    elsif (               defined $bu) { return  1;          }
+    else                               { return  0;          }
+}
+
+sub map_spans(&$)
+{
+    my($block, $set) = @_;
+
+    my @edges = @{$set->{edges}};
+    my @spans = ();
+
+    if ($set->{negInf} and $set->{posInf})
+    {
+	local $_ = [ undef, undef ];
+	push @spans, &$block();
+    }
+    elsif ($set->{negInf})
+    {
+	my $upper = shift @edges;
+	local $_ = [ undef, $upper ];
+	push @spans, &$block();
+    }
+
+    while (@edges > 1)
+    {
+	my($lower, $upper) = splice(@edges, 0, 2);
+	local $_ = [ $lower+1, $upper ];
+	push @spans, &$block();
+    }
+
+    if (@edges)
+    {
+	my $lower = shift @edges;
+	local $_ = [ $lower+1, undef ];
+	push @spans, &$block();
+    }
+    
+    @spans = sort bySpan @spans;
+    @edges = ();
+    my $map_set = $set->new;
+    $map_set->{edges} = \@edges;
+
+    if (@spans and not defined $spans[0][0])
+    {
+	$map_set->{negInf} = 1;
+	my $span = shift @spans;
+
+	if (not defined $span->[1])
+	{
+	    $map_set->{posInf} = 1;
+	    return $map_set;
+	}
+	    
+	push @edges, $span->[1];
+
+	while (@spans and not defined $spans[0][0])
+	{
+	    my $span = shift @spans;
+	    $edges[0] = $span->[1] if $edges[0] < $span->[1];
+	}
+    }
+
+    for (@spans) { $_->[0]--; }
+
+    if (@spans and not @edges)
+    {
+	my $span = shift @spans;
+
+	if (defined $span->[1])
+	{
+	    push @edges, @$span;
+	}
+	else
+	{
+	    push @edges, $span->[0];
+	    $map_set->{posInf} = 1;
+	    return $map_set;
+	}
+    }
+
+    while (@spans and defined $spans[0][1])
+    {
+	my $span = shift @spans;
+	if ($edges[-1] < $span->[0])
+	{
+	    push @edges, @$span;
+	}
+	else
+	{
+	    $edges[-1] = $span->[1] if $edges[-1] < $span->[1];
+	}
+    }
+
+    if (@spans)
+    {
+	$map_set->{posInf} = 1;
+	my $span = shift @spans;
+
+	if ($edges[-1] < $span->[0])
+	{
+	    push @edges, $span->[0];
+	}
+	else
+	{
+	    pop @edges;
 	}
     }
 
@@ -1117,16 +1440,18 @@ Set::IntSpan - Manages sets of integers
 
 =head1 SYNOPSIS
 
-  use Set::IntSpan qw(grep_set map_set);
+  use Set::IntSpan qw(grep_set map_set grep_spans map_spans);
   
   $Set::IntSpan::Empty_String = $string;
   
   $set    = new   Set::IntSpan $set_spec;
+  $set    = new   Set::IntSpan @set_specs;
   $valid  = valid Set::IntSpan $run_list;
   $set    = copy  $set $set_spec;
   
   $run_list = run_list $set;
   @elements = elements $set;
+  @sets     = sets     $set;
   @spans    = spans    $set;
   
   $u_set = union      $set $set_spec;
@@ -1141,6 +1466,7 @@ Set::IntSpan - Manages sets of integers
   subset     $set $set_spec;
   
   $n = cardinality $set;
+  $n = size        $set;
   
   empty      $set;
   finite     $set;
@@ -1155,9 +1481,18 @@ Set::IntSpan - Manages sets of integers
   
   $min = min $set;
   $max = max $set;
+
+  $holes   = holes $set;
+  $cover   = cover $set;
+  $inset   = inset $set $n;
+  $smaller = trim  $set $n;
+  $bigger  = pad   $set $n;
   
-  $subset = grep_set { ... } $set;
-  $mapset = map_set  { ... } $set;
+  $subset  = grep_set 	{ ... } $set;
+  $mapset  = map_set  	{ ... } $set;
+
+  $subset  = grep_spans { ... } $set;
+  $mapset  = map_spans  { ... } $set;
   
   for ($element=$set->first; defined $element; $element=$set->next) { ... }
   for ($element=$set->last ; defined $element; $element=$set->prev) { ... }
@@ -1177,7 +1512,7 @@ Nothing
 
 =head2 C<@EXPORT_OK>
 
-C<grep_set>, C<map_set>
+C<grep_set>, C<map_set>, C<grep_spans>, C<map_spans>
 
 
 =head1 DESCRIPTION
@@ -1350,8 +1685,12 @@ Using C<start>, a loop can iterate over portions of an infinite set.
 
 =item I<$set> = C<new> C<Set::IntSpan> I<$set_spec>
 
+=item I<$set> = C<new> C<Set::IntSpan> I<@set_specs>
+
 Creates and returns a C<Set::IntSpan> object.
-The initial contents of the set are given by I<$set_spec>.
+
+The initial contents of the set are given by I<$set_spec>,
+or by the union of all the I<@set_specs>.
 
 
 =item I<$ok> = C<valid> C<Set::IntSpan> I<$run_list>
@@ -1385,6 +1724,13 @@ In scalar context, returns an array reference.
 I<$set> is not affected.
 
 
+=item I<@sets> = C<sets> I<$set>
+
+Returns the runs in I<$set>,
+as a list of C<Set::IntSpan> objects.
+The sets in the list are in order.
+
+
 =item I<@spans> = C<spans> I<$set>
 
 Returns the runs in I<$set>,
@@ -1401,6 +1747,8 @@ then the upper and lower bounds of the corresponding span will be equal.
 If the set has no lower bound, then $a1 will be C<undef>.
 Similarly, 
 if the set has no upper bound, then $bN will be C<undef>.
+
+The runs in the list are in order.
 
 
 =back
@@ -1479,8 +1827,11 @@ Returns true iff I<$set> is a subset of I<$set_spec>.
 
 =item I<$n> = C<cardinality> I<$set>
 
+=item I<$n> = C<size> I<$set>
+
 Returns the number of elements in I<$set>.
 Returns -1 for infinite sets.
+C<size> is provided as an alias for C<cardinality>.
 
 
 =item C<empty> I<$set>
@@ -1554,6 +1905,48 @@ or C<undef> if there is none.
 
 Returns the largest element of I<$set>,
 or C<undef> if there is none.
+
+=back
+
+
+=head2 Spans
+
+=over 4
+
+=item I<$holes> = C<holes> I<$set>
+
+Returns a set containing all the holes in I<$set>,
+that is, all the integers that are in-between spans of I<$set>.
+
+C<holes> is always a finite set.
+
+
+=item I<$cover> = C<cover> I<$set>
+
+Returns a set consisting of a single span from I<$set>->C<min> to
+I<$set>->C<max>. This is the same as
+
+  union $set $set->holes
+
+
+=item I<$inset> = C<inset> I<$set> I<$n>
+
+=item I<$smaller> = C<trim> I<$set> I<$n>
+
+=item I<$bigger> = C<pad> I<$set> I<$n>
+
+C<inset> returns a set constructed by removing I<$n> integers from
+each end of each span of I<$set>. If I<$n> is negative, then -I<$n>
+integers are added to each end of each span.
+
+In the first case, spans may vanish from the set;
+in the second case, holes may vanish.
+
+C<trim> is provided as a synonym for C<inset>.
+
+C<pad> I<$set> I<$n> is the same as C<inset> I<$set> -I<$n>.
+
+
 
 =back
 
@@ -1696,6 +2089,40 @@ so each element of I<$set> may produce zero, one,
 or more elements in the returned set.
 
 Returns C<undef> if I<$set> is infinite.
+
+=item I<$sub_set> = C<grep_spans> { ... } I<$set>
+
+Evaluates the BLOCK for each span in I<$set>
+and returns a C<Set::IntSpan> object containing those spans
+for which the BLOCK returns TRUE.
+
+Within BLOCK, C<$_> is locally set to an array ref of the form
+
+  [ $lower, $upper ] 
+
+where I<$lower> and I<$upper> are the bounds of the span.
+If the span contains only one integer, then I<$lower> and I<$upper> will be equal.
+If the span is unbounded, then the corresponding element(s) of the array will be C<undef>.
+
+=item I<$map_set> = C<map_spans> { ... } I<$set>
+
+Evaluates the BLOCK for each span in I<$set>,
+and returns a C<Set::IntSpan> object consisting of the union of
+all the spans returned as results of all those evaluations.
+
+Within BLOCK, C<$_> is locally set to an array ref of the form
+
+  [ $lower, $upper ] 
+
+as described above for C<grep_spans>. 
+Each evaulation of BLOCK must return a list of array refs of the same form.
+Each returned list may contain zero, one, or more spans.
+Spans may be returned in any order, and need not be disjoint.
+However, for each bounded span, the constraint
+
+  $lower <= $upper
+
+must hold.
 
 =back
 
@@ -1884,7 +2311,7 @@ Martin Krzywinski <martink@bcgsc.ca>
 
 =head1 COPYRIGHT
 
-Copyright 1996-2005 by Steven McDougall. This module is free
+Copyright (c) 1996-2007 by Steven McDougall. This module is free
 software; you can redistribute it and/or modify it under the same
 terms as Perl itself.
 
