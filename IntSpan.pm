@@ -6,8 +6,96 @@ use integer;
 use base qw(Exporter);
 use Carp;
 
-our $VERSION   = '1.10';
+our $VERSION   = '1.11';
 our @EXPORT_OK = qw(grep_set map_set grep_spans map_spans);
+
+use overload
+    '+'    => 'union'     ,
+    '-'    => 'diff'      ,
+    '*'    => 'intersect' ,
+    '^'    => 'xor'       ,
+    '~'    => 'complement',
+
+    '+='   => 'U'	  ,
+    '-='   => 'D'	  ,
+    '*='   => 'I'	  ,
+    '^='   => 'X'	  ,
+
+    'eq'   => 'set_eq' 	  ,
+    'ne'   => 'set_ne' 	  ,
+    'lt'   => 'set_lt' 	  ,
+    'le'   => 'set_le' 	  ,
+    'gt'   => 'set_gt' 	  ,
+    'ge'   => 'set_ge' 	  ,
+
+    '<=>'  => 'spaceship' ,
+    'cmp'  => 'spaceship' ,
+
+    '""'   => 'run_list'  ,
+    'bool' => sub { not shift->empty };
+
+sub _reorder # restore the order of args that are reversed by operator overloads
+{
+    if ($_[2])
+    {
+	my $temp = $_[0];
+	$_[0] = $_[1];
+	$_[1] = $temp;
+    }
+}
+
+sub set_eq
+{
+    my($a, $set_spec) = @_;
+    my $b = $a->_real_set($set_spec);
+    $a->equal($b)
+}
+
+sub set_le
+{
+    my($a, $set_spec, $reverse) = @_;
+    my $b = $a->_real_set($set_spec);
+    _reorder($a, $b, $reverse);
+    $a->subset($b)
+}
+
+sub set_ge
+{
+    my($a, $set_spec, $reverse) = @_;
+    my $b = $a->_real_set($set_spec);
+    _reorder($a, $b, $reverse);
+    $a->superset($b)
+}
+
+sub set_ne {             not &set_eq }
+sub set_lt { &set_le and not &set_eq }
+sub set_gt { &set_ge and not &set_eq }
+
+
+sub set_cmp
+{
+    my($a, $b, $reverse) = @_;
+    $b = $a->_real_set($b);
+
+    _reorder($a, $b, $reverse);
+
+    $a->equal($b) ? 0 : 1;
+}
+
+
+sub spaceship
+{
+    my($a, $b, $reverse) = @_;
+    ref $a and $a = $a->size;
+    ref $b and $b = $b->size;
+
+    _reorder($a, $b, $reverse);
+
+    $a ==  $b and return  0;
+    $a <   0  and return  1;
+    $b <   0  and return -1;
+    $a <=> $b
+}
 
 
 $Set::IntSpan::Empty_String = '-';
@@ -16,7 +104,7 @@ $Set::IntSpan::Empty_String = '-';
 sub new
 {
     my($this, $set_spec, @set_specs) = @_;
-   
+
     my $class = ref($this) || $this;
     my $set   = bless { }, $class;
     $set->{empty_string} = \$Set::IntSpan::Empty_String;
@@ -46,13 +134,13 @@ sub copy
 {
     my($set, $set_spec) = @_;
 
-  SWITCH: 
+  SWITCH:
     {
 	defined $set_spec            or  $set->_copy_empty   (         ), last;
 	ref     $set_spec            or  $set->_copy_run_list($set_spec), last;
 	ref     $set_spec eq 'ARRAY' and $set->_copy_array   ($set_spec), last;
 				         $set->_copy_set     ($set_spec)      ;
-    }    
+    }
 
     $set
 }
@@ -61,7 +149,7 @@ sub copy
 sub _copy_empty			# makes $set the empty set
 {
     my $set = shift;
-    
+
     $set->{negInf} = 0;
     $set->{posInf} = 0;
     $set->{edges } = [];
@@ -89,7 +177,7 @@ sub _copy_array			# copies an array into a set
 	    push @edges, $element-1, $element;
 	}
     }
-    
+
     $set->{edges} = \@edges
 }
 
@@ -97,7 +185,7 @@ sub _copy_array			# copies an array into a set
 sub _copy_set			# copies one set to another
 {
     my($dest, $src) = @_;
-    
+
     $dest->{negInf} =     $src->{negInf};
     $dest->{posInf} =     $src->{posInf};
     $dest->{edges } = [ @{$src->{edges }} ];
@@ -112,16 +200,16 @@ sub _copy_run_list		# parses a run list
 
     $runList =~ s/\s|_//g;
     return if $runList eq '-';	# empty set
-  
+
     my($first, $last) = (1, 0);	# verifies order of infinite runs
 
     my @edges;
     for my $run (split(/,/ , $runList))
     {
     	croak "Set::IntSpan::_copy_run_list: Bad order: $runList\n" if $last;
-    	
-      RUN: 
-    	{	    	
+
+      RUN:
+    	{
 	    $run =~ /^ (-?\d+) $/x and do
 	    {
 		push(@edges, $1-1, $1);
@@ -130,7 +218,7 @@ sub _copy_run_list		# parses a run list
 
 	    $run =~ /^ (-?\d+) - (-?\d+) $/x and do
 	    {
-		croak "Set::IntSpan::_copy_run_list: Bad order: $runList\n" 
+		croak "Set::IntSpan::_copy_run_list: Bad order: $runList\n"
 		    if $1 > $2;
 		push(@edges, $1-1, $2);
 		last RUN;
@@ -138,7 +226,7 @@ sub _copy_run_list		# parses a run list
 
 	    $run =~ /^ \( - (-?\d+) $/x and do
 	    {
-		croak "Set::IntSpan::_copy_run_list: Bad order: $runList\n" 
+		croak "Set::IntSpan::_copy_run_list: Bad order: $runList\n"
 		    unless $first;
 		$set->{negInf} = 1;
 		push @edges, $1;
@@ -155,7 +243,7 @@ sub _copy_run_list		# parses a run list
 
 	    $run =~ /^ \( - \) $/x and do
 	    {
-		croak "Set::IntSpan::_copy_run_list: Bad order: $runList\n" 
+		croak "Set::IntSpan::_copy_run_list: Bad order: $runList\n"
 		    unless $first;
 		$last = 1;
 		$set->{negInf} = 1;
@@ -168,10 +256,10 @@ sub _copy_run_list		# parses a run list
 
 	$first = 0;
     }
-    
+
     $set->{edges} = [ @edges ];
-    
-    $set->_cleanup or 
+
+    $set->_cleanup or
 	croak "Set::IntSpan::_copy_run_list: Bad order: $runList\n";
 }
 
@@ -181,7 +269,7 @@ sub _copy_run_list		# parses a run list
 sub _cleanup
 {
     my $set = shift;
-    my $edges = $set->{edges};	
+    my $edges = $set->{edges};
 
     my $i=0;
     while ($i < $#$edges)
@@ -193,7 +281,7 @@ sub _cleanup
 	    $cmp ==  1 and return 0;
 	}
     }
-    
+
     1
 }
 
@@ -201,7 +289,7 @@ sub _cleanup
 sub run_list
 {
     my $set = shift;
-    
+
     $set->empty and return ${$set->{empty_string}};
 
     my @edges = @{$set->{edges}};
@@ -224,7 +312,7 @@ sub run_list
 	    push @runs, "$lower-$upper";
 	}
     }
-    
+
     join(',', @runs)
 }
 
@@ -238,7 +326,7 @@ sub elements
 {
     my $set = shift;
 
-    ($set->{negInf} or $set->{posInf}) and 
+    ($set->{negInf} or $set->{posInf}) and
 	croak "Set::IntSpan::elements: infinite set\n";
 
     my @elements;
@@ -301,10 +389,19 @@ sub _real_set		# converts a set specification into a set
     my($set, $set_spec) = @_;
 
     (defined $set_spec and ref $set_spec and ref $set_spec ne 'ARRAY') ?
-	$set_spec : 
+	$set_spec :
 	$set->new($set_spec)
 }
 
+sub U
+{
+    my($a, $set_spec) = @_;
+    my $s = $a->union($set_spec);
+    $a->{negInf} = $s->{negInf};
+    $a->{posInf} = $s->{posInf};
+    $a->{edges } = $s->{edges };
+    $a
+}
 
 sub union
 {
@@ -313,14 +410,14 @@ sub union
     my $s = $a->new;
 
     $s->{negInf} = $a->{negInf} || $b->{negInf};
-    
+
     my $eA = $a->{edges};
     my $eB = $b->{edges};
     my $eS = $s->{edges};
-    
+
     my $inA = $a->{negInf};
     my $inB = $b->{negInf};
-    
+
     my $iA = 0;
     my $iB = 0;
 
@@ -328,7 +425,7 @@ sub union
     {
 	my $xA = $$eA[$iA];
 	my $xB = $$eB[$iB];
-	
+
 	if ($xA < $xB)
 	{
 	    $iA++;
@@ -359,6 +456,16 @@ sub union
 }
 
 
+sub I
+{
+    my($a, $set_spec) = @_;
+    my $s = $a->intersect($set_spec);
+    $a->{negInf} = $s->{negInf};
+    $a->{posInf} = $s->{posInf};
+    $a->{edges } = $s->{edges };
+    $a
+}
+
 sub intersect
 {
     my($a, $set_spec) = @_;
@@ -366,14 +473,14 @@ sub intersect
     my $s = $a->new;
 
     $s->{negInf} = $a->{negInf} && $b->{negInf};
-    
+
     my $eA = $a->{edges};
     my $eB = $b->{edges};
     my $eS = $s->{edges};
-    
+
     my $inA = $a->{negInf};
     my $inB = $b->{negInf};
-    
+
     my $iA = 0;
     my $iB = 0;
 
@@ -381,7 +488,7 @@ sub intersect
     {
 	my $xA = $$eA[$iA];
 	my $xB = $$eB[$iB];
-	
+
 	if ($xA < $xB)
 	{
 	    $iA++;
@@ -412,21 +519,34 @@ sub intersect
 }
 
 
-sub diff
+sub D
 {
     my($a, $set_spec) = @_;
+    my $s = $a->diff($set_spec);
+    $a->{negInf} = $s->{negInf};
+    $a->{posInf} = $s->{posInf};
+    $a->{edges } = $s->{edges };
+    $a
+}
+
+sub diff
+{
+    my($a, $set_spec, $reverse) = @_;
     my $b = $a->_real_set($set_spec);
+
+    _reorder($a, $b, $reverse);
+
     my $s = $a->new;
 
     $s->{negInf} = $a->{negInf} && ! $b->{negInf};
-    
+
     my $eA = $a->{edges};
     my $eB = $b->{edges};
     my $eS = $s->{edges};
-    
+
     my $inA = $a->{negInf};
     my $inB = $b->{negInf};
-    
+
     my $iA = 0;
     my $iB = 0;
 
@@ -434,7 +554,7 @@ sub diff
     {
 	my $xA = $$eA[$iA];
 	my $xB = $$eB[$iB];
-	
+
 	if ($xA < $xB)
 	{
 	    $iA++;
@@ -465,6 +585,16 @@ sub diff
 }
 
 
+sub X
+{
+    my($a, $set_spec) = @_;
+    my $s = $a->xor($set_spec);
+    $a->{negInf} = $s->{negInf};
+    $a->{posInf} = $s->{posInf};
+    $a->{edges } = $s->{edges };
+    $a
+}
+
 sub xor
 {
     my($a, $set_spec) = @_;
@@ -472,11 +602,11 @@ sub xor
     my $s = $a->new;
 
     $s->{negInf} = $a->{negInf} ^ $b->{negInf};
-    
+
     my $eA = $a->{edges};
     my $eB = $b->{edges};
     my $eS = $s->{edges};
-    
+
     my $iA = 0;
     my $iB = 0;
 
@@ -484,7 +614,7 @@ sub xor
     {
 	my $xA = $$eA[$iA];
 	my $xB = $$eB[$iB];
-	
+
 	if ($xA < $xB)
 	{
 	    $iA++;
@@ -513,11 +643,15 @@ sub xor
 sub complement
 {
     my $set = shift;
-    my $comp = $set->new($set);
-    
-    $comp->{negInf} = ! $comp->{negInf};
-    $comp->{posInf} = ! $comp->{posInf};
-    $comp
+    $set->new($set)->C
+}
+
+sub C
+{
+    my $set = shift;
+    $set->{negInf} = ! $set->{negInf};
+    $set->{posInf} = ! $set->{posInf};
+    $set
 }
 
 
@@ -542,19 +676,19 @@ sub equal
 {
     my($a, $set_spec) = @_;
     my $b = $a->_real_set($set_spec);
-    
+
     $a->{negInf} == $b->{negInf} or return 0;
     $a->{posInf} == $b->{posInf} or return 0;
-    
+
     my $aEdge = $a->{edges};
     my $bEdge = $b->{edges};
     @$aEdge == @$bEdge or return 0;
-    
+
     for (my $i=0; $i<@$aEdge; $i++)
     {
 	$$aEdge[$i] == $$bEdge[$i] or return 0;
     }
-    
+
     1
 }
 
@@ -600,7 +734,7 @@ sub empty
 sub finite
 {
     my $set = shift;
-    
+
     not $set->{negInf} and not $set->{posInf}
 }
 
@@ -612,7 +746,7 @@ sub pos_inf { shift->{posInf} }
 sub infinite
 {
     my $set = shift;
-    
+
     $set->{negInf} or $set->{posInf}
 }
 
@@ -620,7 +754,7 @@ sub infinite
 sub universal
 {
     my $set = shift;
-    
+
     $set->{negInf} and not @{$set->{edges}} and $set->{posInf}
 }
 
@@ -628,10 +762,10 @@ sub universal
 sub member
 {
     my($set, $n) = @_;
-    
+
     my $inSet = $set->{negInf};
     my $edge  = $set->{edges};
-    
+
     for (my $i=0; $i<@$edge; $i++)
     {
 	if ($inSet)
@@ -645,7 +779,7 @@ sub member
 	    $inSet = 1;
 	}
     }
-    
+
     $inSet
 }
 
@@ -677,7 +811,7 @@ sub insert
 
     my $lGap = $i==0      || $n-1 - $edge->[$i-1];
     my $rGap = $i==@$edge || $edge->[$i] - $n;
-    
+
     if    (    $lGap and     $rGap) { splice @$edge, $i, 0, $n-1, $n }
     elsif (not $lGap and     $rGap) { $edge->[$i-1]++                }
     elsif (    $lGap and not $rGap) { $edge->[$i  ]--                }
@@ -835,7 +969,7 @@ sub inset
 	my $edge = shift @edges;
 	push @inset, $edge + $nAbs;
     }
-    
+
 
     $inset->{edges} = \@inset;
     $inset
@@ -882,7 +1016,7 @@ sub grep_set(&$)
     my $sub_set = $set->new;
     $sub_set->{edges} = \@sub_edges;
     $sub_set
-}    
+}
 
 
 sub map_set(&$)
@@ -912,7 +1046,7 @@ sub map_set(&$)
     }
 
     $map_set
-}    
+}
 
 
 sub grep_spans(&$)
@@ -963,7 +1097,7 @@ sub grep_spans(&$)
 
     $sub_set->{edges} = \@sub_edges;
     $sub_set
-}    
+}
 
 sub bySpan
 {
@@ -1010,7 +1144,7 @@ sub map_spans(&$)
 	local $_ = [ $lower+1, undef ];
 	push @spans, &$block();
     }
-    
+
     @spans = sort bySpan @spans;
     @edges = ();
     my $map_set = $set->new;
@@ -1026,7 +1160,7 @@ sub map_spans(&$)
 	    $map_set->{posInf} = 1;
 	    return $map_set;
 	}
-	    
+
 	push @edges, $span->[1];
 
 	while (@spans and not defined $spans[0][0])
@@ -1083,7 +1217,7 @@ sub map_spans(&$)
     }
 
     $map_set
-}    
+}
 
 
 sub first($)
@@ -1120,7 +1254,7 @@ sub start($$)
 
     my $inSet = $set->{negInf};
     my $edges = $set->{edges};
-    
+
     for (my $i=0; $i<@$edges; $i++)
     {
 	if ($inSet)
@@ -1143,7 +1277,7 @@ sub start($$)
 	    $inSet = 1;
 	}
     }
-    
+
     if ($inSet)
     {
 	$set->{iterator} = $start;
@@ -1245,7 +1379,7 @@ sub _at_pos
 	my($lower, $upper) = splice(@edges, 0, 2);
 
 	my $size = $upper - $lower;
-	
+
 	$i < $size and return $lower + 1 + $i;
 
 	$i -= $size;
@@ -1269,7 +1403,7 @@ sub _at_neg
 	my($lower, $upper) = splice(@edges, -2, 2);
 
 	my $size = $upper - $lower;
-	
+
 	-$i < $size and return $upper + $i;
 
 	$i += $size;
@@ -1312,7 +1446,7 @@ sub _splice_pos
     {
 	my ($lower, $upper) = @edges[0,1];
 	my $size = $upper - $lower;
-	
+
 	$offset < $size and last;
 
 	splice(@edges, 0, 2);
@@ -1441,44 +1575,50 @@ Set::IntSpan - Manages sets of integers
 =head1 SYNOPSIS
 
   use Set::IntSpan qw(grep_set map_set grep_spans map_spans);
-  
+
   $Set::IntSpan::Empty_String = $string;
-  
+
   $set    = new   Set::IntSpan $set_spec;
   $set    = new   Set::IntSpan @set_specs;
   $valid  = valid Set::IntSpan $run_list;
   $set    = copy  $set $set_spec;
-  
+
   $run_list = run_list $set;
   @elements = elements $set;
   @sets     = sets     $set;
   @spans    = spans    $set;
-  
+
   $u_set = union      $set $set_spec;
   $i_set = intersect  $set $set_spec;
   $x_set = xor        $set $set_spec;
   $d_set = diff       $set $set_spec;
   $c_set = complement $set;
-  
-  equal      $set $set_spec;
-  equivalent $set $set_spec;
-  superset   $set $set_spec;
-  subset     $set $set_spec;
-  
+
+  $set->U($set_spec);   # Union
+  $set->I($set_spec);   # Intersect
+  $set->X($set_spec);   # Xor
+  $set->D($set_spec);   # Diff
+  $set->C;              # Complement
+
+  equal      $set $set_spec
+  equivalent $set $set_spec
+  superset   $set $set_spec
+  subset     $set $set_spec
+
   $n = cardinality $set;
   $n = size        $set;
-  
-  empty      $set;
-  finite     $set;
-  neg_inf    $set;
-  pos_inf    $set;
-  infinite   $set;
-  universal  $set;
-  
+
+  empty      $set
+  finite     $set
+  neg_inf    $set
+  pos_inf    $set
+  infinite   $set
+  universal  $set
+
   member     $set $n;
   insert     $set $n;
   remove     $set $n;
-  
+
   $min = min $set;
   $max = max $set;
 
@@ -1487,21 +1627,65 @@ Set::IntSpan - Manages sets of integers
   $inset   = inset $set $n;
   $smaller = trim  $set $n;
   $bigger  = pad   $set $n;
-  
+
   $subset  = grep_set 	{ ... } $set;
   $mapset  = map_set  	{ ... } $set;
 
   $subset  = grep_spans { ... } $set;
   $mapset  = map_spans  { ... } $set;
-  
+
   for ($element=$set->first; defined $element; $element=$set->next) { ... }
   for ($element=$set->last ; defined $element; $element=$set->prev) { ... }
-  
+
   $element = $set->start($n);
   $element = $set->current;
-  
+
   $n       = $set->at($i);
   $slice   = $set->slice($from, $to);
+
+=head2 Operator overloads
+
+  $u_set =  $set + $set_spec;   # union
+  $i_set =  $set * $set_spec;	# intersect
+  $x_set =  $set ^ $set_spec;	# xor
+  $d_set =  $set - $set_spec;	# diff
+  $c_set = ~$set;               # complement
+
+  $set += $set_spec;            # union
+  $set *= $set_spec;		# intersect
+  $set ^= $set_spec;		# xor
+  $set -= $set_spec;		# diff
+
+  $set eq $set_spec		# equal
+  $set ne $set_spec		# not equal
+  $set le $set_spec		# subset
+  $set lt $set_spec		# proper subset
+  $set ge $set_spec		# superset
+  $set gt $set_spec		# proper superset
+
+  # compare sets by cardinality
+  $set1 ==  $set2
+  $set1 !=  $set2
+  $set1 <=  $set2
+  $set1 <   $set2
+  $set1 >=  $set2
+  $set1 >   $set2
+  $set1 <=> $set2
+
+  # compare cardinality of set to an integer
+  $set1 ==  $n
+  $set1 !=  $n
+  $set1 <=  $n
+  $set1 <   $n
+  $set1 >=  $n
+  $set1 >   $n
+  $set1 <=> $n
+
+  @sorted = sort @sets;         # sort sets by cardinality
+
+  if ($set) { ... }             # true if $set is not empty
+
+  print "$set\n";               # stringizes to the run list
 
 
 =head1 EXPORTS
@@ -1526,24 +1710,24 @@ These arise, for example, in .newsrc files, which maintain lists of articles:
 
 Sets are stored internally in a run-length coded form.
 This provides for both compact storage and efficient computation.
-In particular, 
+In particular,
 set operations can be performed directly on the encoded representation.
 
 C<Set::IntSpan> is designed to manage finite sets.
 However, it can also represent some simple infinite sets, such as {x | x>n}.
-This allows operations involving complements to be carried out consistently, 
+This allows operations involving complements to be carried out consistently,
 without having to worry about the actual value of INT_MAX on your machine.
 
 
 =head1 SET SPECIFICATIONS
 
-Many of the methods take a I<set specification>.  
+Many of the methods take a I<set specification>.
 There are four kinds of set specifications.
 
 =head2 Empty
 
 If a set specification is omitted, then the empty set is assumed.
-Thus, 
+Thus,
 
   $set = new Set::IntSpan;
 
@@ -1559,8 +1743,8 @@ If an object reference is given, it is taken to be a C<Set::IntSpan> object.
 
 =head2 Array reference
 
-If an array reference is given, 
-then the elements of the array are taken to be the elements of the set.  
+If an array reference is given,
+then the elements of the array are taken to be the elements of the set.
 The array may contain duplicate elements.
 The elements of the array may be in any order.
 
@@ -1614,7 +1798,7 @@ It is also denoted by the special form '-' (a single dash).
 
 =head2 Restrictions
 
-The runs in a run list must be disjoint, 
+The runs in a run list must be disjoint,
 and must be listed in increasing order.
 
 Valid characters in a run list are 0-9, '(', ')', '-' and ','.
@@ -1658,8 +1842,8 @@ the negative integers
 
 =head1 ITERATORS
 
-Each set has a single I<iterator>, 
-which is shared by all calls to 
+Each set has a single I<iterator>,
+which is shared by all calls to
 C<first>, C<last>, C<start>, C<next>, C<prev>, and C<current>.
 At all times,
 the iterator is either an element of the set,
@@ -1670,7 +1854,7 @@ C<next>, and C<prev> move it;
 and C<current> returns it.
 Calls to these methods may be freely intermixed.
 
-Using C<next> and C<prev>, 
+Using C<next> and C<prev>,
 a single loop can move both forwards and backwards through a set.
 Using C<start>, a loop can iterate over portions of an infinite set.
 
@@ -1712,7 +1896,7 @@ Returns a run list that represents I<$set>.
 The run list will not contain white space.
 I<$set> is not affected.
 
-By default, the empty set is formatted as '-'; 
+By default, the empty set is formatted as '-';
 a different string may be specified in C<$Set::IntSpan::Empty_String>.
 
 
@@ -1736,7 +1920,7 @@ The sets in the list are in order.
 Returns the runs in I<$set>,
 as a list of the form
 
-  ([$a1, $b1], 
+  ([$a1, $b1],
    [$a2, $b2],
    ...
    [$aN, $bN])
@@ -1745,7 +1929,7 @@ If a run contains only a single integer,
 then the upper and lower bounds of the corresponding span will be equal.
 
 If the set has no lower bound, then $a1 will be C<undef>.
-Similarly, 
+Similarly,
 if the set has no upper bound, then $bN will be C<undef>.
 
 The runs in the list are in order.
@@ -1756,8 +1940,11 @@ The runs in the list are in order.
 
 =head2 Set operations
 
-=over 4
+For these operations,
+a new C<Set::IntSpan> object is created and returned.
+The operands are not affected.
 
+=over 4
 
 =item I<$u_set> = C<union> I<$set> I<$set_spec>
 
@@ -1771,7 +1958,7 @@ Returns the set of integers in both I<$set> and I<$set_spec>.
 
 =item I<$x_set> = C<xor> I<$set> I<$set_spec>
 
-Returns the set of integers in I<$set> or I<$set_spec>, 
+Returns the set of integers in I<$set> or I<$set_spec>,
 but not both.
 
 
@@ -1787,9 +1974,40 @@ Returns the set of integers that are not in I<$set>.
 =back
 
 
-For all set operations, 
-a new C<Set::IntSpan> object is created and returned.
-The operands are not affected.
+
+=head2 Mutators
+
+By popular demand, C<Set::IntSpan> now has mutating forms of the binary set operations.
+These methods alter the object on which they are called.
+
+=over 4
+
+=item I<$set>->C<U>(I<$set_spec>)
+
+Makes I<$set> the union of I<$set> and I<$set_spec>.
+Returns I<$set>.
+
+=item I<$set>->C<I>(I<$set_spec>)
+
+Makes I<$set> the intersection of I<$set> and I<$set_spec>.
+Returns I<$set>.
+
+=item I<$set>->C<X>(I<$set_spec>)
+
+Makes I<$set> the symmetric difference of I<$set> and I<$set_spec>.
+Returns I<$set>.
+
+=item I<$set>->C<D>(I<$set_spec>)
+
+Makes I<$set> the difference of I<$set> and I<$set_spec>.
+Returns I<$set>.
+
+=item I<$set>->C<C>
+
+Converts I<$set> to its own complement.
+Returns I<$set>.
+
+=back
 
 
 =head2 Comparison
@@ -1859,7 +2077,7 @@ Returns true iff I<$set> contains {x | x>n} for some n.
 Returns true iff I<$set> is infinite.
 
 
-=item universal I<$set>
+=item C<universal> I<$set>
 
 Returns true iff I<$set> contains all integers.
 
@@ -1897,7 +2115,7 @@ Does nothing if I<$n> is not a member of I<$set>.
 
 =item C<min> I<$set>
 
-Returns the smallest element of I<$set>, 
+Returns the smallest element of I<$set>,
 or C<undef> if there is none.
 
 
@@ -1947,7 +2165,6 @@ C<trim> is provided as a synonym for C<inset>.
 C<pad> I<$set> I<$n> is the same as C<inset> I<$set> -I<$n>.
 
 
-
 =back
 
 
@@ -1988,7 +2205,7 @@ sets the iterator to C<undef>.
 Returns the iterator.
 
 C<next> will return C<undef> only once;
-the next call to C<next> will reset the iterator to 
+the next call to C<next> will reset the iterator to
 the smallest element of I<$set>.
 
 
@@ -2000,7 +2217,7 @@ sets the iterator to C<undef>.
 Returns the iterator.
 
 C<prev> will return C<undef> only once;
-the next call to C<prev> will reset the iterator to 
+the next call to C<prev> will reset the iterator to
 the largest element of I<$set>.
 
 
@@ -2064,13 +2281,84 @@ I<$from> is negative and I<$set> is C<pos_inf>
 =back
 
 
+=head1 OPERATOR OVERLOADS
+
+For convenience, some operators are overloaded on C<Set::IntSpan> objects.
+
+=head2 set operations
+
+One operand must be a C<Set::IntSpan> object.
+The other operand may be a C<Set::IntSpan> object or a set specification.
+
+  $u_set =  $set + $set_spec;   # union
+  $i_set =  $set * $set_spec;	# intersect
+  $x_set =  $set ^ $set_spec;	# xor
+  $d_set =  $set - $set_spec;	# diff
+  $c_set = ~$set;               # complement
+
+  $set += $set_spec;            # union
+  $set *= $set_spec;		# intersect
+  $set ^= $set_spec;		# xor
+  $set -= $set_spec;		# diff
+
+=head2 equality
+
+The string comparison operations are overloaded to compare sets for equality and containment.
+One operand must be a C<Set::IntSpan> object.
+The other operand may be a C<Set::IntSpan> object or a set specification.
+
+  $set eq $set_spec		# equal
+  $set ne $set_spec		# not equal
+  $set le $set_spec		# subset
+  $set lt $set_spec		# proper subset
+  $set ge $set_spec		# superset
+  $set gt $set_spec		# proper superset
+
+=head2 equivalence
+
+The numerical comparison operations are overloaded to compare sets by cardinality.
+One operand must be a C<Set::IntSpan> object.
+The other operand may be a C<Set::IntSpan> object or an integer.
+
+  $set1 ==  $set2
+  $set1 !=  $set2
+  $set1 <=  $set2
+  $set1 <   $set2
+  $set1 >=  $set2
+  $set1 >   $set2
+  $set1 <=> $set2
+  $set1 cmp $set2
+
+  $set1 ==  $n
+  $set1 !=  $n
+  $set1 <=  $n
+  $set1 <   $n
+  $set1 >=  $n
+  $set1 >   $n
+  $set1 <=> $n
+  $set1 cmp $n
+
+N.B. The C<cmp> operator is overloaded to compare sets by cardinality, not containment.
+This is done so that
+
+  sort @sets
+
+will sort a list of sets by cardinality.
+
+=head2 conversion
+
+In boolean context, a C<$Set::IntSpan> object evaulates to true if it is not empty.
+
+A C<$Set::IntSpan> object stringizes to its run list.
+
+
 =head1 FUNCTIONS
 
 =over 4
 
 =item I<$sub_set> = C<grep_set> { ... } I<$set>
 
-Evaluates the BLOCK for each integer in I<$set> 
+Evaluates the BLOCK for each integer in I<$set>
 (locally setting C<$_> to each integer)
 and returns a C<Set::IntSpan> object containing those integers
 for which the BLOCK returns TRUE.
@@ -2079,12 +2367,12 @@ Returns C<undef> if I<$set> is infinite.
 
 =item I<$map_set> = C<map_set> { ... } I<$set>
 
-Evaluates the BLOCK for each integer in I<$set> 
-(locally setting C<$_> to each integer) 
+Evaluates the BLOCK for each integer in I<$set>
+(locally setting C<$_> to each integer)
 and returns a C<Set::IntSpan> object containg
 all the integers returned as results of all those evaluations.
 
-Evaluates the BLOCK in list context, 
+Evaluates the BLOCK in list context,
 so each element of I<$set> may produce zero, one,
 or more elements in the returned set.
 
@@ -2098,7 +2386,7 @@ for which the BLOCK returns TRUE.
 
 Within BLOCK, C<$_> is locally set to an array ref of the form
 
-  [ $lower, $upper ] 
+  [ $lower, $upper ]
 
 where I<$lower> and I<$upper> are the bounds of the span.
 If the span contains only one integer, then I<$lower> and I<$upper> will be equal.
@@ -2112,9 +2400,9 @@ all the spans returned as results of all those evaluations.
 
 Within BLOCK, C<$_> is locally set to an array ref of the form
 
-  [ $lower, $upper ] 
+  [ $lower, $upper ]
 
-as described above for C<grep_spans>. 
+as described above for C<grep_spans>.
 Each evaulation of BLOCK must return a list of array refs of the same form.
 Each returned list may contain zero, one, or more spans.
 Spans may be returned in any order, and need not be disjoint.
@@ -2135,7 +2423,7 @@ must hold.
 
 C<$Set::IntSpan::Empty_String> contains the string that is returned when
 C<run_list> is called on the empty set.
-C<$Empty_String> is initially '-'; 
+C<$Empty_String> is initially '-';
 alternatively, it may be set to ''.
 Other values should be avoided,
 to ensure that C<run_list> always returns a valid run list.
@@ -2184,7 +2472,7 @@ Any method (except C<valid>) will C<die> if it is passed an invalid run list.
 
 =item Out of memory!
 
-(X) C<elements> I<$set> can generate an "Out of memory!" 
+(X) C<elements> I<$set> can generate an "Out of memory!"
 message on sufficiently large finite sets.
 
 =back
@@ -2198,9 +2486,9 @@ Beware of forms like
 
   union $set [1..5];
 
-This passes an element of @set to union, 
+This passes an element of @set to union,
 which is probably not what you want.
-To force interpretation of $set and [1..5] as separate arguments, 
+To force interpretation of $set and [1..5] as separate arguments,
 use forms like
 
     union $set +[1..5];
@@ -2208,26 +2496,6 @@ use forms like
 or
 
     $set->union([1..5]);
-
-=head2 Cardinality
-
-You cannot use the obvious comparison routine
-
-  { $a->cardinality <=> $b->cardinality }
-
-to sort sets by size, 
-because C<cardinality> returns -1 for infinte sets.
-(All the non-negative integers were taken. Sorry.)
-
-Instead, you have to write something like
-
-  {  my $a_card = $a->cardinality;
-     my $b_card = $b->cardinality;
-     
-     $a_card == $b_card and return  0;
-     $a_card <  0       and return  1;
-     $b_card <  0       and return -1;
-     $a_card <=> $b_card                }
 
 =head2 grep_set and map_set
 
@@ -2255,7 +2523,7 @@ To catch exceptions, protect method calls with an eval:
 To check return codes, use an appropriate method call to validate arguments:
 
     $run_list = <STDIN>;
-    if (valid Set::IntSpan $run_list) 
+    if (valid Set::IntSpan $run_list)
        { $set = new Set::IntSpan $run_list }
     else
        { print "$@ try again\n" }
@@ -2266,7 +2534,7 @@ Similarly, use C<finite> to protect calls to C<elements>:
 
 Calling C<elements> on a large, finite set can generate an "Out of
 memory!" message, which cannot (easily) be trapped.
-Applications that must retain control after an error can use C<intersect> to 
+Applications that must retain control after an error can use C<intersect> to
 protect calls to C<elements>:
 
     @elements = elements { intersect $set "-1_000_000 - 1_000_000" };
@@ -2277,14 +2545,14 @@ or check the size of $set first:
 
 =head2 Limitations
 
-Although C<Set::IntSpan> can represent some infinite sets, 
-it does I<not> perform infinite-precision arithmetic.  
-Therefore, 
+Although C<Set::IntSpan> can represent some infinite sets,
+it does I<not> perform infinite-precision arithmetic.
+Therefore,
 finite elements are restricted to the range of integers on your machine.
 
 =head2 Roots
 
-The sets implemented here are based on a Macintosh data structure called 
+The sets implemented here are based on a Macintosh data structure called
 a I<region>.
 See Inside Macintosh for more information.
 

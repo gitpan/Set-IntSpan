@@ -1,5 +1,9 @@
 jRevision history for Perl extension Set::IntSpan
 
+1.11  2007 Mar 17
+	- added mutating set operations
+	- added operator overloads
+
 1.10  2007 Mar 04
         - extened new to take list of set_specs
         - added size as an alias for cardinality
