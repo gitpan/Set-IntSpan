@@ -48,13 +48,27 @@ my @New_list =
  ['40-45', '20-25', '10-15', '1', '12-13', '1,10-15,20-25,40-45' ]
 );
 
+my @New_array =
+(
+ [ [ 3, 2, 1                             ], "1-3"         ],
+ [ [ [ undef, -1 ]                       ], "(--1"        ],
+ [ [ 5, [ undef, 1 ], 3    		 ], "(-1,3,5" 	  ],
+ [ [ 5, [ undef, 1 ], 3, 4 		 ], "(-1,3-5" 	  ],
+ [ [ 5, [ undef, 1 ], 3, [ 8, undef ], 4 ], "(-1,3-5,8-)" ],
+ [ [ 5, [ undef, 1 ], 3, [ 6, undef ], 4 ], "(-1,3-)"     ],
+ [ [ 5, [ undef, 2 ], 3, [ 4, undef ], 4 ], "(-)"         ],
+ [ [ [ 1, 5 ], [ 3, 8 ], 27              ], "1-8,27"      ],
+ [ [ 1, [ 5, 8 ], 5, [ 7, 9 ], 2         ], "1-2,5-9"     ],
 
-print "1..", @New * 6 + @New_list, "\n";
-New     ();
-Elements();
-Sets    ();
-Spans   ();
-New_list();
+);
+
+print "1..", @New * 7 + @New_list + @New_array, "\n";
+New      ();
+Elements ();
+Sets     ();
+Spans    ();
+New_list ();
+New_array();
 
 
 sub New
@@ -157,10 +171,15 @@ sub Spans
 
     for my $t (@New)
     {
-	my $set      = new Set::IntSpan $t->[0];
-	my @spans    = spans $set;
+	my $set1     = new Set::IntSpan $t->[0];
+	my @spans    = spans $set1;
 	my $expected = $t->[3];
 	equal_lists(\@spans, $expected) or Not; OK;
+
+	my $set2    = new Set::IntSpan $t->[3];
+	equal $set1 $set2 or Not; OK;
+	print "set1 $set1, set2 $set2\n";
+	
     }
 }
 
@@ -171,10 +190,13 @@ sub equal_lists
     # print "a <@$a>, b <@$b>\n";
     @$a==@$b or return 0;
 
-    while (@$a)
+    my @a = @$a;
+    my @b = @$b;
+
+    while (@a)
     {
-	my $aa = shift @$a;
-	my $bb = shift @$b;
+	my $aa = shift @a;
+	my $bb = shift @b;
 
 	if    (ref     $aa and ref     $bb) { equal_lists($aa, $bb) 		  or return 0 }
 	elsif (defined $aa and defined $bb) { $aa == $bb	    		  or return 0 }
@@ -194,5 +216,16 @@ sub New_list
 	my $set = new Set::IntSpan @run_lists;
 	my $actual = $set->run_list;
 	$set->equal($expected) or Not; OK;
+    }
+}
+
+
+sub New_array
+{
+    for my $t (@New_array)
+    {
+	my $actual = new Set::IntSpan $t->[0];
+	my $expected = $t->[1];
+	$actual eq $expected or Not; OK;
     }
 }

@@ -1,5 +1,8 @@
 jRevision history for Perl extension Set::IntSpan
 
+1.12  2007 Sep 08
+        - added support for spans in constructors
+
 1.11  2007 Mar 17
 	- added mutating set operations
 	- added operator overloads

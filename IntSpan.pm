@@ -6,7 +6,7 @@ use integer;
 use base qw(Exporter);
 use Carp;
 
-our $VERSION   = '1.11';
+our $VERSION   = '1.12';
 our @EXPORT_OK = qw(grep_set map_set grep_spans map_spans);
 
 use overload
@@ -160,25 +160,103 @@ sub _copy_array			# copies an array into a set
 {
     my($set, $array) = @_;
 
-    $set->{negInf} = 0;
-    $set->{posInf} = 0;
+    my @spans = map { ref $_ ? [ @$_ ] : [ $_, $_ ] } @$array;
+
+    $set->_insert_spans(\@spans)
+}
+
+
+sub bySpan
+{
+    my($al, $au) = @$a;
+    my($bl, $bu) = @$b;
+
+       if (defined $al && defined $bl) { return $al <=> $bl; }
+    elsif (defined $al               ) { return  1;          }
+    elsif (               defined $bl) { return -1;          }
+    elsif (defined $au               ) { return -1;          }
+    elsif (               defined $bu) { return  1;          }
+    else                               { return  0;          }
+}
+
+sub _insert_spans
+{
+    my($set, $spans) = @_;
 
     my @edges;
-    for my $element (sort { $a <=> $b } @$array)
-    {
-	next if @edges and $edges[-1] == $element; # skip duplicates
+    $set->{negInf} = 0;
+    $set->{posInf} = 0;
+    $set->{edges } = \@edges;
 
-	if (@edges and $edges[-1] == $element-1)
+    my @spans = sort bySpan @$spans;
+
+    if (@spans and not defined $spans[0][0])
+    {
+	$set->{negInf} = 1;
+	my $span = shift @spans;
+
+	if (not defined $span->[1])
 	{
-	    $edges[-1] = $element;
+	    $set->{posInf} = 1;
+	    return $set;
 	}
-	else
+
+	push @edges, $span->[1];
+
+	while (@spans and not defined $spans[0][0])
 	{
-	    push @edges, $element-1, $element;
+	    my $span = shift @spans;
+	    $edges[0] = $span->[1] if $edges[0] < $span->[1];
 	}
     }
 
-    $set->{edges} = \@edges
+    for (@spans) { $_->[0]--; }
+
+    if (@spans and not @edges)
+    {
+	my $span = shift @spans;
+
+	if (defined $span->[1])
+	{
+	    push @edges, @$span;
+	}
+	else
+	{
+	    push @edges, $span->[0];
+	    $set->{posInf} = 1;
+	    return $set;
+	}
+    }
+
+    while (@spans and defined $spans[0][1])
+    {
+	my $span = shift @spans;
+	if ($edges[-1] < $span->[0])
+	{
+	    push @edges, @$span;
+	}
+	else
+	{
+	    $edges[-1] = $span->[1] if $edges[-1] < $span->[1];
+	}
+    }
+
+    if (@spans)
+    {
+	$set->{posInf} = 1;
+	my $span = shift @spans;
+
+	if ($edges[-1] < $span->[0])
+	{
+	    push @edges, $span->[0];
+	}
+	else
+	{
+	    pop @edges;
+	}
+    }
+
+    return $set
 }
 
 
@@ -1099,25 +1177,12 @@ sub grep_spans(&$)
     $sub_set
 }
 
-sub bySpan
-{
-    my($al, $au) = @$a;
-    my($bl, $bu) = @$b;
-
-       if (defined $al && defined $bl) { return $al <=> $bl; }
-    elsif (defined $al               ) { return  1;          }
-    elsif (               defined $bl) { return -1;          }
-    elsif (defined $au               ) { return -1;          }
-    elsif (               defined $bu) { return  1;          }
-    else                               { return  0;          }
-}
-
 sub map_spans(&$)
 {
     my($block, $set) = @_;
 
     my @edges = @{$set->{edges}};
-    my @spans = ();
+    my @spans;
 
     if ($set->{negInf} and $set->{posInf})
     {
@@ -1145,78 +1210,7 @@ sub map_spans(&$)
 	push @spans, &$block();
     }
 
-    @spans = sort bySpan @spans;
-    @edges = ();
-    my $map_set = $set->new;
-    $map_set->{edges} = \@edges;
-
-    if (@spans and not defined $spans[0][0])
-    {
-	$map_set->{negInf} = 1;
-	my $span = shift @spans;
-
-	if (not defined $span->[1])
-	{
-	    $map_set->{posInf} = 1;
-	    return $map_set;
-	}
-
-	push @edges, $span->[1];
-
-	while (@spans and not defined $spans[0][0])
-	{
-	    my $span = shift @spans;
-	    $edges[0] = $span->[1] if $edges[0] < $span->[1];
-	}
-    }
-
-    for (@spans) { $_->[0]--; }
-
-    if (@spans and not @edges)
-    {
-	my $span = shift @spans;
-
-	if (defined $span->[1])
-	{
-	    push @edges, @$span;
-	}
-	else
-	{
-	    push @edges, $span->[0];
-	    $map_set->{posInf} = 1;
-	    return $map_set;
-	}
-    }
-
-    while (@spans and defined $spans[0][1])
-    {
-	my $span = shift @spans;
-	if ($edges[-1] < $span->[0])
-	{
-	    push @edges, @$span;
-	}
-	else
-	{
-	    $edges[-1] = $span->[1] if $edges[-1] < $span->[1];
-	}
-    }
-
-    if (@spans)
-    {
-	$map_set->{posInf} = 1;
-	my $span = shift @spans;
-
-	if ($edges[-1] < $span->[0])
-	{
-	    push @edges, $span->[0];
-	}
-	else
-	{
-	    pop @edges;
-	}
-    }
-
-    $map_set
+    $set->new->_insert_spans(\@spans)
 }
 
 
@@ -1708,15 +1702,40 @@ These arise, for example, in .newsrc files, which maintain lists of articles:
   alt.foo: 1-21,28,31
   alt.bar: 1-14192,14194,14196-14221
 
+A run of consecutive integers is sometimes called a I<span>.
+
 Sets are stored internally in a run-length coded form.
 This provides for both compact storage and efficient computation.
 In particular,
 set operations can be performed directly on the encoded representation.
 
 C<Set::IntSpan> is designed to manage finite sets.
-However, it can also represent some simple infinite sets, such as {x | x>n}.
+However, it can also represent some simple infinite sets, such as { x | x>n }.
 This allows operations involving complements to be carried out consistently,
 without having to worry about the actual value of INT_MAX on your machine.
+
+
+=head1 SPANS
+
+A I<span> is a run of consecutive integers.
+A span may be represented by an array reference,
+in any of 5 forms:
+
+=head2 Finite forms
+
+    Span                Set
+  [ $n,    $n    ]      { n }
+  [ $a,    $b    ]      { x | a<=x && x<=b}
+
+=head2 Infinite forms
+
+    Span                Set
+  [ undef, $b    ]      { x | x<=b }
+  [ $a   , undef ]      { x | x>=a }
+  [ undef, undef ]      The set of all integers
+
+
+Some methods operate directly on spans.
 
 
 =head1 SET SPECIFICATIONS
@@ -1737,16 +1756,11 @@ creates a new, empty set.  Similarly,
 
 removes all elements from $set.
 
+
 =head2 Object reference
 
 If an object reference is given, it is taken to be a C<Set::IntSpan> object.
 
-=head2 Array reference
-
-If an array reference is given,
-then the elements of the array are taken to be the elements of the set.
-The array may contain duplicate elements.
-The elements of the array may be in any order.
 
 =head2 Run list
 
@@ -1757,7 +1771,7 @@ A run list is a comma-separated list of I<runs>.
 Each run specifies a set of consecutive integers.
 The set is the union of all the runs.
 
-Runs may be written in any of several forms.
+Runs may be written in any of 5 forms.
 
 =head2 Finite forms
 
@@ -1769,7 +1783,7 @@ Runs may be written in any of several forms.
 
 =item a-b
 
-{x | a<=x && x<=b}
+{ x | a<=x && x<=b }
 
 =back
 
@@ -1779,11 +1793,11 @@ Runs may be written in any of several forms.
 
 =item (-n
 
-{x | x<=n}
+{ x | x<=n }
 
 =item n-)
 
-{x | x>=n}
+{ x | x>=n }
 
 =item (-)
 
@@ -1807,37 +1821,48 @@ Other characters are not allowed.
 
 =head2 Examples
 
-=over 15
+  Run list          Set
+  "-"               { }
+  "1"               { 1 }
+  "1-2"             { 1, 2 }
+  "-5--1"           { -5, -4, -3, -2, -1 }
+  "(-)"             the integers
+  "(--1"            the negative integers
+  "1-3, 4, 18-21"   { 1, 2, 3, 4, 18, 19, 20, 21 }
 
-=item S< >-
 
-{ }
+=head2 Array reference
 
-=item S< >1
+If an array reference is given,
+then the elements of the array specify the elements of the set.
+The array may contain
 
-{ 1 }
+=over 4
 
-=item S< >1-2
+=item *
 
-{ 1, 2 }
+integers
 
-=item S< >-5--1
+=item *
 
-{ -5, -4, -3, -2, -1 }
-
-=item S< >(-)
-
-the integers
-
-=item S< >(--1
-
-the negative integers
-
-=item S< >1-3, 4, 18-21
-
-{ 1, 2, 3, 4, 18, 19, 20, 21 }
+L<spans|/SPANS>
 
 =back
+
+The set is the union of all the integers and spans in the array.
+The integers and spans need not be disjoint.
+The integers and spans may be in any order.
+
+=head2 Examples
+
+  Array ref            		    Set
+  [ ]                		    { }
+  [ 1, 1 ]                          { 1 }
+  [ 1, 3, 2 ]        		    { 1, 2, 3 }
+  [ 1, [ 5, 8 ], 5, [ 7, 9 ], 2 ]   { 1, 2, 5, 6, 7, 8, 9 }
+  [ undef, undef ]                  the integers
+  [ undef, -1 ]                     the negative integers
+
 
 
 =head1 ITERATORS
@@ -2347,7 +2372,7 @@ will sort a list of sets by cardinality.
 
 =head2 conversion
 
-In boolean context, a C<$Set::IntSpan> object evaulates to true if it is not empty.
+In boolean context, a C<$Set::IntSpan> object evaluates to true if it is not empty.
 
 A C<$Set::IntSpan> object stringizes to its run list.
 
@@ -2369,12 +2394,14 @@ Returns C<undef> if I<$set> is infinite.
 
 Evaluates the BLOCK for each integer in I<$set>
 (locally setting C<$_> to each integer)
-and returns a C<Set::IntSpan> object containg
+and returns a C<Set::IntSpan> object containing
 all the integers returned as results of all those evaluations.
 
 Evaluates the BLOCK in list context,
 so each element of I<$set> may produce zero, one,
 or more elements in the returned set.
+The elements may be returned in any order,
+and need not be disjoint.
 
 Returns C<undef> if I<$set> is infinite.
 
@@ -2403,7 +2430,7 @@ Within BLOCK, C<$_> is locally set to an array ref of the form
   [ $lower, $upper ]
 
 as described above for C<grep_spans>.
-Each evaulation of BLOCK must return a list of array refs of the same form.
+Each evaluation of BLOCK must return a list of L<spans|/SPANS>.
 Each returned list may contain zero, one, or more spans.
 Spans may be returned in any order, and need not be disjoint.
 However, for each bounded span, the constraint
@@ -2452,7 +2479,7 @@ Any method (except C<valid>) will C<die> if it is passed an invalid run list.
 
 =item C<Set::IntSpan::elements: infinite set>
 
-(F) An infinte set was passed to C<elements>.
+(F) An infinite set was passed to C<elements>.
 
 =item C<Set::IntSpan::at: negative infinite set>
 
@@ -2497,6 +2524,7 @@ or
 
     $set->union([1..5]);
 
+
 =head2 grep_set and map_set
 
 C<grep_set> and C<map_set> make it easy to construct
@@ -2506,6 +2534,7 @@ is I<not> small. Consider:
   $billion = new Set::IntSpan '0-1_000_000_000';   # OK
   $odd     = grep_set { $_ & 1 } $billion;         # trouble
   $even    = map_set  { $_ * 2 } $billion;         # double trouble
+
 
 =head2 Error handling
 
@@ -2543,18 +2572,34 @@ or check the size of $set first:
 
     finite $set and cardinality $set < 2_000_000 and @elements = elements $set;
 
+
 =head2 Limitations
 
 Although C<Set::IntSpan> can represent some infinite sets,
 it does I<not> perform infinite-precision arithmetic.
-Therefore,
-finite elements are restricted to the range of integers on your machine.
+Therefore, finite elements are restricted to the range of integers on your machine.
+
+
+=head2 Extensions
+
+Users report that you can construct Set::IntSpan objects on anything that
+behaves like an integer. For example:
+
+    $x   = new Math::BigInt ...;
+    $set = new Set::Intspan [ [ $x, $x+5 ] ];
+
+I'm not documenting this as supported behavior,
+because I don't have the resources to test it,
+but I'll try not to break it.
+If anyone finds problems with it, let me know.
+
 
 =head2 Roots
 
 The sets implemented here are based on a Macintosh data structure called
-a I<region>.
-See Inside Macintosh for more information.
+a I<region>. See Inside Macintosh for more information.
+
+C<Set::IntSpan> was originally written to manage run lists for the L<C<News::Newsrc>> module.
 
 
 =head1 AUTHOR
@@ -2573,6 +2618,10 @@ Malcolm Cook <mec@stowers-institute.org>
 =item *
 
 Martin Krzywinski <martink@bcgsc.ca>
+
+=item *
+
+Marc Lehmann <schmorp@schmorp.de>
 
 =back
 
