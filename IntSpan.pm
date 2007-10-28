@@ -6,7 +6,7 @@ use integer;
 use base qw(Exporter);
 use Carp;
 
-our $VERSION   = '1.12';
+our $VERSION   = '1.13';
 our @EXPORT_OK = qw(grep_set map_set grep_spans map_spans);
 
 use overload
@@ -841,54 +841,29 @@ sub member
 {
     my($set, $n) = @_;
 
-    my $inSet = $set->{negInf};
-    my $edge  = $set->{edges};
+    my $i = _bsearch($set->{edges}, $n);
 
-    for (my $i=0; $i<@$edge; $i++)
-    {
-	if ($inSet)
-	{
-	    return 1 if $n <= $$edge[$i];
-	    $inSet = 0;
-	}
-	else
-	{
-	    return 0 if $n <= $$edge[$i];
-	    $inSet = 1;
-	}
-    }
-
-    $inSet
+    $set->{negInf} xor $i & 1
 }
 
+use constant INSERT => 0;
+use constant REMOVE => 1;
 
-sub insert
+sub insert { _indel(@_, INSERT); }
+sub remove { _indel(@_, REMOVE); }
+
+sub _indel # INsertion/DELetion
 {
-    my($set, $n) = @_;
+    my($set, $n, $indel) = @_;
     defined $n or return;
 
-    my $inSet = $set->{negInf};
     my $edge = $set->{edges};
+    my $i    = _bsearch($edge, $n);
 
-    my $i;
-    for ($i=0; $i<@$edge; $i++)
-    {
-	if ($inSet)
-	{
-	    $n <= $edge->[$i] and return;
-	    $inSet = 0;
-	}
-	else
-	{
-	    $n <= $edge->[$i] and last;
-	    $inSet = 1;
-	}
-    }
+    return if $set->{negInf} xor $i & 1 xor $indel;
 
-    $inSet and return;
-
-    my $lGap = $i==0      || $n-1 - $edge->[$i-1];
-    my $rGap = $i==@$edge || $edge->[$i] - $n;
+    my $lGap = $i==0      || $edge->[$i-1] < $n-1;
+    my $rGap = $i==@$edge || $n            < $edge->[$i];
 
     if    (    $lGap and     $rGap) { splice @$edge, $i, 0, $n-1, $n }
     elsif (not $lGap and     $rGap) { $edge->[$i-1]++                }
@@ -896,34 +871,35 @@ sub insert
     else                            { splice @$edge, $i-1, 2         }
 }
 
-
-sub remove
+# Returns the index of the first edge that satisifies target <= edge.
+# Returns $#$edges+1 if target > the last edge.
+# Returns 0 if edges is empty.
+sub _bsearch
 {
-    my($set, $n) = @_;
-    defined $n or return;
+    my($edges, $target) = @_;
 
-    my $inSet = $set->{negInf};
-    my $edge  = $set->{edges};
+    @$edges or return 0;
 
-    my $i;
-    for ($i=0; $i<@$edge; $i++)
+    my $lower = 0;
+    my $upper = $#$edges;
+
+    while ($lower+1 < $upper)
     {
-	if ($inSet)
+	my $mid = int(($lower + $upper) / 2);
+
+	if ($target <= $edges->[$mid])
 	{
-	    last if $n <= $$edge[$i];
-	    $inSet = 0;
+	    $upper = $mid;
 	}
 	else
 	{
-	    return if $n <= $$edge[$i];
-	    $inSet = 1;
+	    $lower = $mid+1;
 	}
     }
 
-    return unless $inSet;
-
-    splice @{$set->{edges}}, $i, 0, $n-1, $n;
-    $set->_cleanup;
+    $target <= $edges->[$lower] and return $lower;
+    $target <= $edges->[$upper] and return $upper;
+    $upper + 1
 }
 
 
@@ -2614,6 +2590,10 @@ Steven McDougall <swmcd@world.std.com>
 =item *
 
 Malcolm Cook <mec@stowers-institute.org>
+
+=item *
+
+David Hawthorne <dsrthorne@hotmail.com>
 
 =item *
 

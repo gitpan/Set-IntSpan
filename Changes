@@ -1,5 +1,8 @@
 jRevision history for Perl extension Set::IntSpan
 
+1.13  2007 Oct 27
+        - recoded member(), insert(), and remove() to use a binary search
+
 1.12  2007 Sep 08
         - added support for spans in constructors
 
@@ -17,7 +20,7 @@ jRevision history for Perl extension Set::IntSpan
 
 1.09  2005 Dec 13
         - added indexing methods
-	- 'die' instead of 'craok' on fatal errors
+	- 'die' instead of 'croak' on fatal errors
 
 1.08  2004 May 07
         - added the spans method

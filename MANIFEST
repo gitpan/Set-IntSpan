@@ -4,6 +4,7 @@ MANIFEST
 Makefile.PL
 README
 t/binary.t
+t/bsearch.t
 t/cardinal.t
 t/creation.t
 t/error.t

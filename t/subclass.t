@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 use strict;
-use Set::IntSpan 1.07;
+use Set::IntSpan 1.13;
 
 @Foo::Bar::ISA = qw(Set::IntSpan);
 

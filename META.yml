@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:                Set-IntSpan
-version:             1.12
+version:             1.13
 abstract:            Manages sets of integers, newsrc style
 license:             ~
 generated_by:        ExtUtils::MakeMaker version 6.32
