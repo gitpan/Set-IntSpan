@@ -22,8 +22,8 @@ my @At_die =
 (
  [ "(-0",  42, "<die>" ],
  [ "0-)", -42, "<die>" ],
-)
-;
+);
+
 my @At_test =
 (
  [ "-"	       	     ,   0, undef ],
@@ -376,7 +376,7 @@ for my $test (@At_die)
 {
     my($run_list, $i) = @$test;
 
-    eval { Set::IntSpan->net($run_list)->at($i) };
+    eval { Set::IntSpan->new($run_list)->at($i) };
     $@ or Not; OK("at", $test);
 }
 

@@ -1,4 +1,7 @@
-jRevision history for Perl extension Set::IntSpan
+Revision history for Perl extension Set::IntSpan
+
+1.14  2010 Jun 22
+        - added ord() method
 
 1.13  2007 Oct 27
         - recoded member(), insert(), and remove() to use a binary search

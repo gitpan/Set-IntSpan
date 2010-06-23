@@ -6,7 +6,7 @@ use integer;
 use base qw(Exporter);
 use Carp;
 
-our $VERSION   = '1.13';
+our $VERSION   = '1.14';
 our @EXPORT_OK = qw(grep_set map_set grep_spans map_spans);
 
 use overload
@@ -1334,7 +1334,6 @@ sub at
     $i < 0 ? $set->_at_neg($i) : $set->_at_pos($i)
 }
 
-
 sub _at_pos
 {
     my($set, $i) = @_;
@@ -1381,6 +1380,38 @@ sub _at_neg
 
     @edges ? $edges[0] + $i : undef
 }
+
+sub ord
+{
+    my($set, $n) = @_;
+
+    $set->{negInf} and
+	croak "Set::IntSpan::ord: negative infinite set\n";
+
+    defined $n or return undef;
+
+    my $i = 0;
+    my @edges = @{$set->{edges}};
+
+    while (@edges)
+    {
+	my($lower, $upper) = splice(@edges, 0, 2);
+
+	$n <= $lower and return undef;
+
+	if (defined $upper and $upper < $n)
+	{
+	    $i += $upper - $lower;
+	    next;
+	}
+
+	return $i + $n - $lower - 1;
+    }
+
+    undef
+}
+
+
 
 sub slice
 {
@@ -1612,6 +1643,7 @@ Set::IntSpan - Manages sets of integers
 
   $n       = $set->at($i);
   $slice   = $set->slice($from, $to);
+  $i       = $set->ord($n);
 
 =head2 Operator overloads
 
@@ -2278,6 +2310,14 @@ I<$from> is negative and I<$set> is C<pos_inf>
 
 =back
 
+=item I<$i> = I<$set>->C<ord>($n)
+
+The inverse of C<at>.
+
+Returns the index I<$i> of the integer I<$n> in I<$set>,
+or C<undef> if I<$n> if not an element of I<$set>.
+
+Dies if I<$set> is C<neg_inf>.
 
 =back
 
@@ -2473,6 +2513,10 @@ Any method (except C<valid>) will C<die> if it is passed an invalid run list.
 
 (F) C<slice> was called with I<$from> negative on a positive infinite set.
 
+=item C<Set::IntSpan::ord: negative infinite set>
+
+(F) C<ord> was called on a negative infinite set.
+
 =item Out of memory!
 
 (X) C<elements> I<$set> can generate an "Out of memory!"
@@ -2608,7 +2652,7 @@ Marc Lehmann <schmorp@schmorp.de>
 
 =head1 COPYRIGHT
 
-Copyright (c) 1996-2007 by Steven McDougall. This module is free
+Copyright (c) 1996-2010 by Steven McDougall. This module is free
 software; you can redistribute it and/or modify it under the same
 terms as Perl itself.
 
