@@ -12,10 +12,12 @@ t/index.t
 t/island.t
 t/iterator.t
 t/member.t
+t/ord.t
 t/overload.t
 t/real_set.t
 t/relation.t
 t/set_spec.t
+t/span_ord.t
 t/spans.t
 t/subclass.t
 t/unary.t

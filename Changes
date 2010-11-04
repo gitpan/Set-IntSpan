@@ -1,5 +1,8 @@
 Revision history for Perl extension Set::IntSpan
 
+1.15  2010 Nov 04
+        - added span_ord() method
+
 1.14  2010 Jun 22
         - added ord() method
 

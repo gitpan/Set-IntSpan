@@ -6,7 +6,7 @@ use integer;
 use base qw(Exporter);
 use Carp;
 
-our $VERSION   = '1.14';
+our $VERSION   = '1.15';
 our @EXPORT_OK = qw(grep_set map_set grep_spans map_spans);
 
 use overload
@@ -902,6 +902,13 @@ sub _bsearch
     $upper + 1
 }
 
+sub span_ord
+{
+    my($set, $n) = @_;
+
+    my $i = _bsearch($set->{edges}, $n);
+    ($set->{negInf} xor $i & 1) ? $i >> 1 : undef
+}
 
 sub min
 {
@@ -1411,8 +1418,6 @@ sub ord
     undef
 }
 
-
-
 sub slice
 {
     my($set, $from, $to) = @_;
@@ -1644,6 +1649,7 @@ Set::IntSpan - Manages sets of integers
   $n       = $set->at($i);
   $slice   = $set->slice($from, $to);
   $i       = $set->ord($n);
+  $i       = $set->span_ord($n);
 
 =head2 Operator overloads
 
@@ -2319,6 +2325,15 @@ or C<undef> if I<$n> if not an element of I<$set>.
 
 Dies if I<$set> is C<neg_inf>.
 
+=item I<$i> = I<$set>->C<span_ord>($n)
+
+Returns the index I<$i> of the span containing the integer I<$n>,
+or C<undef> if I<$n> if not an element of I<$set>.
+
+To recover the span continaing I<$n>, write
+
+  (I<$set>->C<spans>)[I<$i>]
+
 =back
 
 
@@ -2646,6 +2661,10 @@ Martin Krzywinski <martink@bcgsc.ca>
 =item *
 
 Marc Lehmann <schmorp@schmorp.de>
+
+=item *
+
+Andrew Olson <aolson@me.com>
 
 =back
 
