@@ -6,7 +6,7 @@ use integer;
 use base qw(Exporter);
 use Carp;
 
-our $VERSION   = '1.15';
+our $VERSION   = '1.16';
 our @EXPORT_OK = qw(grep_set map_set grep_spans map_spans);
 
 use overload
@@ -2330,9 +2330,9 @@ Dies if I<$set> is C<neg_inf>.
 Returns the index I<$i> of the span containing the integer I<$n>,
 or C<undef> if I<$n> if not an element of I<$set>.
 
-To recover the span continaing I<$n>, write
+To recover the span containing I<$n>, write
 
-  (I<$set>->C<spans>)[I<$i>]
+  ($set->spans)[$i]
 
 =back
 
@@ -2403,9 +2403,9 @@ will sort a list of sets by cardinality.
 
 =head2 conversion
 
-In boolean context, a C<$Set::IntSpan> object evaluates to true if it is not empty.
+In boolean context, a C<Set::IntSpan> object evaluates to true if it is not empty.
 
-A C<$Set::IntSpan> object stringizes to its run list.
+A C<Set::IntSpan> object stringizes to its run list.
 
 
 =head1 FUNCTIONS

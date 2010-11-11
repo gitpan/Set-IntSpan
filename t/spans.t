@@ -68,7 +68,7 @@ sub stretch_up
 }
 
 
-my @Maps  = ('', '$_', 'mirror', 'mirror_mirror', 'double_up', 'stretch_up');
+my @Maps  = ('()', '$_', 'mirror', 'mirror_mirror', 'double_up', 'stretch_up');
 
 print "1..", @Sets * (@Greps + @Maps), "\n";
 
@@ -96,7 +96,7 @@ sub Grep
 
 	    printf "#%3d: grep_span { %-8s } %-20s -> %s\n",
 	    $N, $Greps[$g], $Sets[$s], $result->run_list;
-    	
+
 	    equal $result $expected or Not; OK;
         }
     }
@@ -129,7 +129,7 @@ sub Map
 
 	    printf "#%3d: map_span { %-8s } %-20s -> %s\n",
 	    $N, $Maps[$g], $Sets[$s], $result->run_list;
-    	
+
 	    equal $result $expected or Not; OK;
         }
     }
