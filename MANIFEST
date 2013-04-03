@@ -12,6 +12,7 @@ t/index.t
 t/island.t
 t/iterator.t
 t/member.t
+t/no-int.t
 t/ord.t
 t/overload.t
 t/real_set.t
@@ -21,4 +22,5 @@ t/span_ord.t
 t/spans.t
 t/subclass.t
 t/unary.t
+t/use-int.t
 META.yml                                Module meta-data (added by MakeMaker)

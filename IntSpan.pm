@@ -1,12 +1,12 @@
 package Set::IntSpan;
 
 use 5;
+use if $Set::IntSpan::integer, qw(integer);
 use strict;
-use integer;
 use base qw(Exporter);
 use Carp;
 
-our $VERSION   = '1.16';
+our $VERSION   = '1.17';
 our @EXPORT_OK = qw(grep_set map_set grep_spans map_spans);
 
 use overload
@@ -160,11 +160,41 @@ sub _copy_array			# copies an array into a set
 {
     my($set, $array) = @_;
 
-    my @spans = map { ref $_ ? [ @$_ ] : [ $_, $_ ] } @$array;
+    my @spans    = 		      grep { ref     } @$array;
+    my @elements = sort { $a <=> $b } grep { not ref } @$array;
+
+    my @span;
+    for my $e (@elements)
+    {
+	if (@span==0)
+	{
+	    push @span, $e;
+	}
+	elsif (@span==1 and $e==$span[0]+1)
+	{
+	    push @span, $e;
+	}
+	elsif (@span==1 and $e >$span[0]+1)
+	{
+	    push @spans, [ $span[0], $span[0] ];
+	    @span = ($e);
+	}
+	elsif (@span==2 and $e==$span[1]+1)
+	{
+	    $span[1] = $e;
+	}
+	elsif (@span==2 and $e >$span[1]+1)
+	{
+	    push @spans, [ @span ];
+	    @span = ($e);
+	}
+    }
+
+    @span==1 and push @spans, [ $span[0], $span[0] ];
+    @span==2 and push @spans, [ @span ];
 
     $set->_insert_spans(\@spans)
 }
-
 
 sub bySpan
 {
@@ -284,7 +314,7 @@ sub _copy_run_list		# parses a run list
     my @edges;
     for my $run (split(/,/ , $runList))
     {
-    	croak "Set::IntSpan::_copy_run_list: Bad order: $runList\n" if $last;
+    	croak "Set::IntSpan::_copy_run_list: Bad order 1: $runList\n" if $last;
 
       RUN:
     	{
@@ -296,7 +326,7 @@ sub _copy_run_list		# parses a run list
 
 	    $run =~ /^ (-?\d+) - (-?\d+) $/x and do
 	    {
-		croak "Set::IntSpan::_copy_run_list: Bad order: $runList\n"
+		croak "Set::IntSpan::_copy_run_list: Bad order 2: $runList\n"
 		    if $1 > $2;
 		push(@edges, $1-1, $2);
 		last RUN;
@@ -304,7 +334,7 @@ sub _copy_run_list		# parses a run list
 
 	    $run =~ /^ \( - (-?\d+) $/x and do
 	    {
-		croak "Set::IntSpan::_copy_run_list: Bad order: $runList\n"
+		croak "Set::IntSpan::_copy_run_list: Bad order 3: $runList\n"
 		    unless $first;
 		$set->{negInf} = 1;
 		push @edges, $1;
@@ -321,7 +351,7 @@ sub _copy_run_list		# parses a run list
 
 	    $run =~ /^ \( - \) $/x and do
 	    {
-		croak "Set::IntSpan::_copy_run_list: Bad order: $runList\n"
+		croak "Set::IntSpan::_copy_run_list: Bad order 4: $runList\n"
 		    unless $first;
 		$last = 1;
 		$set->{negInf} = 1;
@@ -338,7 +368,7 @@ sub _copy_run_list		# parses a run list
     $set->{edges} = [ @edges ];
 
     $set->_cleanup or
-	croak "Set::IntSpan::_copy_run_list: Bad order: $runList\n";
+	croak "Set::IntSpan::_copy_run_list: Bad order 5: $runList\n";
 }
 
 
@@ -1580,9 +1610,11 @@ Set::IntSpan - Manages sets of integers
 
 =head1 SYNOPSIS
 
+
+  # BEGIN { $Set::IntSpan::integer = 1 }
   use Set::IntSpan qw(grep_set map_set grep_spans map_spans);
 
-  $Set::IntSpan::Empty_String = $string;
+  # $Set::IntSpan::Empty_String = '-';   # or '';
 
   $set    = new   Set::IntSpan $set_spec;
   $set    = new   Set::IntSpan @set_specs;
@@ -1716,7 +1748,7 @@ These arise, for example, in .newsrc files, which maintain lists of articles:
   alt.foo: 1-21,28,31
   alt.bar: 1-14192,14194,14196-14221
 
-A run of consecutive integers is sometimes called a I<span>.
+A run of consecutive integers is also called a I<span>.
 
 Sets are stored internally in a run-length coded form.
 This provides for both compact storage and efficient computation.
@@ -1787,7 +1819,7 @@ The set is the union of all the runs.
 
 Runs may be written in any of 5 forms.
 
-=head2 Finite forms
+=head3 Finite forms
 
 =over 8
 
@@ -1801,7 +1833,7 @@ Runs may be written in any of 5 forms.
 
 =back
 
-=head2 Infinite forms
+=head3 Infinite forms
 
 =over 8
 
@@ -1819,12 +1851,12 @@ The set of all integers
 
 =back
 
-=head2 Empty forms
+=head3 Empty forms
 
 The empty set is consistently written as '' (the null string).
 It is also denoted by the special form '-' (a single dash).
 
-=head2 Restrictions
+=head3 Restrictions
 
 The runs in a run list must be disjoint,
 and must be listed in increasing order.
@@ -1833,7 +1865,7 @@ Valid characters in a run list are 0-9, '(', ')', '-' and ','.
 White space and underscore (_) are ignored.
 Other characters are not allowed.
 
-=head2 Examples
+=head3 Examples
 
   Run list          Set
   "-"               { }
@@ -1867,7 +1899,7 @@ The set is the union of all the integers and spans in the array.
 The integers and spans need not be disjoint.
 The integers and spans may be in any order.
 
-=head2 Examples
+=head3 Examples
 
   Array ref            		    Set
   [ ]                		    { }
@@ -2491,7 +2523,32 @@ stored in I<$set>->{C<empty_string>}.
 Subclasses that wish to override the value of C<$Empty_String> can
 reassign this reference.
 
+=over 4
+
+=item C<$Set::IntSpan::integer>
+
+Up until version 1.16, C<Set::IntSpan> specified C<use integer>,
+because they were sets of...you know...integers.
+As of 2012, users are reporting newsgroups with article numbers above
+0x7fffffff, which break C<Set::IntSpan> on 32-bit processors.
+
+Version 1.17 removes C<use integer> by default.
+This extends the usable range of C<Set::IntSpan> to the number of bits
+in the mantissa of your floating point representation.
+For IEEE 754 doubles, this is 53 bits, or around 9e15.
+
+I benchmarked C<Set::IntSpan> on a Pentium 4,
+and it looks like C<use integer> provides a 2% to 4% speedup,
+depending on the application.
+
+If you want C<use integer> back, either for performance,
+or because you are somehow dependent on its semantics, write
+
+  BEGIN { $Set::IntSpan::integer = 1 }
+  use Set::IntSpan;
+
 =back
+
 
 
 =head1 DIAGNOSTICS
@@ -2666,12 +2723,16 @@ Marc Lehmann <schmorp@schmorp.de>
 
 Andrew Olson <aolson@me.com>
 
+=item *
+
+Nicholas Redgrave <baron@bologrew.net>
+
 =back
 
 
 =head1 COPYRIGHT
 
-Copyright (c) 1996-2010 by Steven McDougall. This module is free
+Copyright (c) 1996-2013 by Steven McDougall. This module is free
 software; you can redistribute it and/or modify it under the same
 terms as Perl itself.
 

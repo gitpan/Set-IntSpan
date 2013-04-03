@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Set-IntSpan
-version:            1.16
+version:            1.17
 abstract:           Manages sets of integers, newsrc style
 author:
     - Steven McDougall (swmcd@world.std.com)
@@ -15,7 +15,7 @@ no_index:
     directory:
         - t
         - inc
-generated_by:       ExtUtils::MakeMaker version 6.56
+generated_by:       ExtUtils::MakeMaker version 6.57_05
 meta-spec:
     url:      http://module-build.sourceforge.net/META-spec-v1.4.html
     version:  1.4
