@@ -1,5 +1,8 @@
 Revision history for Perl extension Set::IntSpan
 
+1.18  2013 Apr 03
+        - POD
+
 1.17  2013 Apr 02
 	- no use integer
 	- optimize _copy_array

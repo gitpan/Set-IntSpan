@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Set-IntSpan
-version:            1.17
+version:            1.18
 abstract:           Manages sets of integers, newsrc style
 author:
     - Steven McDougall (swmcd@world.std.com)

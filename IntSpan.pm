@@ -6,7 +6,7 @@ use strict;
 use base qw(Exporter);
 use Carp;
 
-our $VERSION   = '1.17';
+our $VERSION   = '1.18';
 our @EXPORT_OK = qw(grep_set map_set grep_spans map_spans);
 
 use overload
@@ -2522,8 +2522,6 @@ C<run_list> accesses C<$Empty_String> through a reference
 stored in I<$set>->{C<empty_string>}.
 Subclasses that wish to override the value of C<$Empty_String> can
 reassign this reference.
-
-=over 4
 
 =item C<$Set::IntSpan::integer>
 
