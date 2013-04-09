@@ -19,7 +19,7 @@ for my $i (0..100)
     insert $set 2e12+$i;
 }
 
-if ($Config{intsize}==4)
+if ($Config{ivsize}==4)
 {
     $set eq '1000000000000-1000000000100' or Not; OK 'use integer';
 }

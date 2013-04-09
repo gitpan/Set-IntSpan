@@ -1,5 +1,8 @@
 Revision history for Perl extension Set::IntSpan
 
+1.19  2014 Apr 09
+        - unit test fix
+
 1.18  2013 Apr 03
         - POD
 
